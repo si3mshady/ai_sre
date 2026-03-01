@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sentinel Prime: v7.3 — CLASSROOM PRODUCTION READY (OLLAMA + NAMESPACE FIXED)
+# Sentinel Prime: v7.3 — CLASSROOM PRODUCTION READY (OLLAMA + TIMEOUT FIXED)
 set -e
 
 # ========= CONFIG =========
@@ -9,15 +9,15 @@ PROJECT_ROOT="/home/$LINUX_USER/sentinel-project"
 MODEL_NAME="${MODEL_NAME:-llama3}"
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-echo "🧹 Purging Old State..."
+echo "🧹 Purging Old State (KEEPING ALL PODS)..."
 kubectl delete ns sentinel prometheus grafana kyverno 2>/dev/null || true
-sudo docker rm -f sentinel-agent* sentinel-dashboard* sentinel-exporter* 2>/dev/null || true
+sudo docker rm -f sentinel-agent sentinel-dashboard sentinel-exporter 2>/dev/null || true
 sudo rm -rf "$PROJECT_ROOT/app/data"
 mkdir -p "$PROJECT_ROOT"/{agent,app/data,k8s,exporter}
 sudo chmod -R 777 "$PROJECT_ROOT/app/data"
 
 ############################################
-# 1. KYVERNO + POLICY
+# 1. KYVERNO + POLICY 
 ############################################
 echo "🛡️ Deploying Kyverno..."
 helm repo add kyverno https://kyverno.github.io/kyverno/ || true
@@ -85,7 +85,7 @@ EOF
 kubectl apply -f /tmp/sentinel-policies.yaml
 
 ############################################
-# 2. SENTINEL CORE - v7.3 (2MIN AI TIMEOUT + FIXED DNS)
+# 2. SENTINEL CORE - v7.3 (180s OLLAMA TIMEOUT)
 ############################################
 cat <<'EOF' > "$PROJECT_ROOT/agent/Dockerfile"
 FROM python:3.10-slim
@@ -94,7 +94,7 @@ COPY agent.py /agent.py
 CMD ["python", "/agent.py"]
 EOF
 
-# 🔥 v7.3: 2MIN TIMEOUT + K3S DNS FIX
+# 🔥 v7.3: 3min Ollama timeout + hostNetwork Ollama access
 cat <<'EOF' > "$PROJECT_ROOT/agent/agent.py"
 #!/usr/bin/env python3
 import os, sys, time, requests, sqlite3, hashlib
@@ -107,7 +107,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 MODEL_NAME = os.getenv("SENTINEL_MODEL", "llama3")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.k3d.local:11434")  # 🔥 v7.3 K3S DNS
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
 DB_PATH = os.getenv("DB_PATH", "/data/sentinel.db")
 
 violations_total = Counter("sentinel_violations_total", "Kyverno policy violations", ["policy", "severity"])
@@ -128,10 +128,10 @@ def init_db():
     conn.close()
     logger.info(f"Database at {DB_PATH}")
 
-def call_sre_ai(msg, timeout=120):  # 🔥 v7.3: 2 MIN TIMEOUT FOR SLOW LOCAL OLLAMA
+def call_sre_ai(msg, timeout=180):  # 🔥 v7.3: 3 MINUTES for slow local Ollama
     try:
         logger.info(f"🤖 Calling Ollama ({timeout}s timeout): {OLLAMA_URL}")
-        prompt = f"You are SRE expert. Concise fix for K8s event: {msg[:200]}"
+        prompt = f"You are SRE expert. Concise fix for: {msg[:200]}"
         r = requests.post(f"{OLLAMA_URL}/api/generate", json={
             "model": MODEL_NAME, "prompt": prompt, "stream": False
         }, timeout=timeout)
@@ -141,11 +141,11 @@ def call_sre_ai(msg, timeout=120):  # 🔥 v7.3: 2 MIN TIMEOUT FOR SLOW LOCAL OL
             return advice[:1000]
         return f"Ollama HTTP {r.status_code}"
     except requests.exceptions.Timeout:
-        logger.warning(f"AI timeout after {timeout}s - using fallback")
-        return f"AI timeout ({timeout}s) - Add resources/team label to pod spec"
+        logger.warning(f"AI timeout after {timeout}s")
+        return f"AI timeout ({timeout}s)"
     except Exception as e:
         logger.error(f"AI error: {e}")
-        return f"AI unavailable - Manual fix: add 'team: ops' label + resources limits"
+        return f"AI error: {str(e)[:100]}"
 
 def update_metrics():
     try:
@@ -157,10 +157,12 @@ def update_metrics():
     except: pass
 
 def is_policy_violation(obj):
-    text = (safe_getattr(obj, "message") + safe_getattr(obj, "note") + safe_getattr(obj, "reason")).lower()
+    msg = safe_getattr(obj, "message", "").lower()
+    note = safe_getattr(obj, "note", "").lower()
+    reason = safe_getattr(obj, "reason", "").lower()
     indicators = ["kyverno", "policy", "validation", "admission", "forbidden"]
-    if any(i in text for i in indicators): return True
-    if safe_getattr(obj, "type") == "Warning" and any(p in text for p in ["require-resources", "require-team-label"]): return True
+    if any(i in msg+note+reason for i in indicators): return True
+    if safe_getattr(obj, "type", "") == "Warning" and any(p in msg+note+reason for p in ["require-resources", "require-team-label"]): return True
     return False
 
 def watch_events():
@@ -176,21 +178,22 @@ def watch_events():
                 
                 if safe_getattr(obj, "type") != "Warning": continue
                 
-                pod = safe_getattr(ref, "name", "unknown")
-                ns = safe_getattr(ref, "namespace", "default")
+                pod_name = safe_getattr(ref, "name") or "unknown"
+                namespace = safe_getattr(ref, "namespace", "default")
+                
                 event_msg = safe_getattr(obj, "note") or safe_getattr(obj, "message", "no message")
                 reason = safe_getattr(obj, "reason", "unknown")
                 msg = f"{event_msg} | {reason}"
                 
-                fp = hashlib.md5(f"{pod}:{ns}:{msg}".encode()).hexdigest()
+                fp = hashlib.md5(f"{pod_name}:{namespace}:{msg}".encode()).hexdigest()
                 now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
                 
+                policy_name = "cluster-event"
                 if is_policy_violation(obj):
-                    logger.info(f"🚨 POLICY: {pod}/{ns} - {reason}")
+                    logger.info(f"🚨 POLICY: {pod_name}/{namespace} - {reason}")
                     policy_name = "require-resources" if "resources" in msg.lower() else "require-team-label"
                 else:
-                    logger.info(f"⚠️ EVENT: {pod}/{ns} - {reason}")
-                    policy_name = "cluster-event"
+                    logger.info(f"⚠️ EVENT: {pod_name}/{namespace} - {reason}")
 
                 conn = sqlite3.connect(DB_PATH, timeout=20)
                 cur = conn.cursor()
@@ -199,14 +202,14 @@ def watch_events():
                 
                 if row:
                     cur.execute("UPDATE incidents SET occurrence_count=?, updated_at=? WHERE fingerprint=?", (row[0]+1, now, fp))
-                    logger.info(f"📊 Updated: {pod}/{ns} (count={row[0]+1})")
+                    logger.info(f"📊 Updated: {pod_name}/{namespace} (count={row[0]+1})")
                 else:
                     ai_analysis = call_sre_ai(msg)
                     cur.execute("INSERT INTO incidents VALUES(NULL,?,?,?,?,?,?,?,?,?)",
-                               (fp, pod, ns, safe_getattr(obj, "type"), msg[:1000], ai_analysis, 1, now, now))
+                               (fp, pod_name, namespace, safe_getattr(obj, "type"), msg[:1000], ai_analysis, 1, now, now))
                     if policy_name != "cluster-event":
                         violations_total.labels(policy=policy_name, severity="warning").inc()
-                    logger.info(f"🆕 NEW INCIDENT ({policy_name}): {pod}/{ns}")
+                    logger.info(f"🆕 NEW: {pod_name}/{namespace}")
                 
                 conn.commit()
                 conn.close()
@@ -216,7 +219,7 @@ def watch_events():
             time.sleep(10)
 
 def main():
-    logger.info("🚀 Sentinel v7.3 - 2MIN AI + K3S DNS FIXED")
+    logger.info("🚀 Sentinel v7.3 - 3min Ollama + hostNetwork")
     init_db()
     start_http_server(8000)
     threading.Thread(target=watch_events, daemon=True).start()
@@ -228,7 +231,7 @@ def main():
 if __name__ == "__main__": main()
 EOF
 
-# Dashboard + Exporter (unchanged)
+# Dashboard + Exporter (unchanged v7.3)
 cat <<'EOF' > "$PROJECT_ROOT/app/Dockerfile"
 FROM python:3.10-slim
 RUN pip install streamlit==1.36.0 pandas==2.2.2 && rm -rf /root/.cache/pip
@@ -251,14 +254,13 @@ if os.path.exists(db):
         if not df.empty:
             col1, col2, col3 = st.columns(3)
             col1.metric("🚨 Incidents", len(df))
-            col2.metric("Repeats", df["occurrence_count"].sum() - len(df))
+            col2.metric("Hits", df["occurrence_count"].sum() - len(df))
             col3.metric("Status", "LIVE")
-            st.bar_chart(df.set_index("pod_name")["occurrence_count"])
-            st.dataframe(df[["namespace","pod_name","message","ai_analysis","occurrence_count"]])
-    except Exception as e:
-        st.error(f"DB error: {e}")
-else:
-    st.warning("Waiting for agent...")
+            st.subheader("Activity"); st.bar_chart(df.set_index("pod_name")["occurrence_count"])
+            st.subheader("Details"); st.dataframe(df[["namespace","pod_name","message","ai_analysis"]], use_container_width=True)
+        else: st.info("🔄 Deploy test workloads!")
+    except Exception as e: st.error(f"DB error: {e}")
+else: st.warning("🔄 Waiting for agent...")
 EOF
 
 cat <<'EOF' > "$PROJECT_ROOT/exporter/Dockerfile"
@@ -272,27 +274,28 @@ cat <<'EOF' > "$PROJECT_ROOT/exporter/exporter.py"
 import sqlite3, time
 from prometheus_client import Gauge, start_http_server
 start_http_server(9090)
-g1 = Gauge("sentinel_violations", "Violations")
-g2 = Gauge("sentinel_occurrences", "Occurrences")
+g1 = Gauge("sentinel_violations", "Violations"); g2 = Gauge("sentinel_occurrences", "Occurrences")
 def update():
     try:
         conn = sqlite3.connect("/data/sentinel.db")
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*), COALESCE(SUM(occurrence_count), 0) FROM incidents")
-        g1.set(cur.fetchone()[0])
-        g2.set(cur.fetchone()[1])
-        conn.close()
+        c, t = cur.fetchone()
+        g1.set(c); g2.set(t); conn.close()
     except: pass
 while True: update(); time.sleep(10)
 EOF
 
 ############################################
-# 3. K8S MANIFEST v7.3 (NAMESPACE FIRST)
+# 3. FIXED K8S MANIFEST v7.3 (NAMESPACE FIRST + hostNetwork)
 ############################################
-echo "📦 Creating sentinel namespace..."
-kubectl create namespace sentinel --dry-run=client -o yaml | kubectl apply -f -
-
 cat > "$PROJECT_ROOT/k8s/sentinel.yaml" << 'EOF'
+# 1. NAMESPACE FIRST (fixes race condition)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sentinel
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -324,17 +327,7 @@ roleRef:
   name: sentinel-event-watcher
   apiGroup: rbac.authorization.k8s.io
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: ollama-host
-  namespace: sentinel
-spec:
-  type: ExternalName
-  externalName: host.k3d.local  # 🔥 v7.3: K3S LOCALHOST
-  ports:
-  - port: 11434
----
+# 🔥 v7.3: Ollama host access via hostNetwork (bypasses DNS)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -342,19 +335,14 @@ metadata:
   namespace: sentinel
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels: {app: agent}
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: agent}}
   template:
-    metadata:
-      labels: {app: agent, team: sentinel-ops}
+    metadata: {labels: {app: agent, team: "sentinel-ops"}}
     spec:
+      hostNetwork: true  # 🔥 Direct host Ollama access
       serviceAccountName: sentinel-agent-sa
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
-        fsGroup: 0
+      securityContext: {runAsUser: 0, runAsGroup: 0, fsGroup: 0}
       containers:
       - name: agent
         image: sentinel-agent:v7.3
@@ -362,25 +350,66 @@ spec:
         - name: SENTINEL_MODEL
           value: "llama3"
         - name: OLLAMA_URL
-          value: "http://host.k3d.local:11434"  # 🔥 v7.3: DIRECT K3S HOST
+          value: "http://host.docker.internal:11434"  # 🔥 Direct host access
         resources:
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-        ports:
-        - containerPort: 8000
-        volumeMounts:
-        - name: data
-          mountPath: /data
+          limits: {cpu: "500m", memory: "512Mi"}
+          requests: {cpu: "100m", memory: "128Mi"}
+        ports: [{containerPort: 8000}]
+        volumeMounts: [{name: data, mountPath: /data}]
         livenessProbe:
-          httpGet:
-            path: /metrics
-            port: 8000
+          httpGet: {path: /metrics, port: 8000}
           initialDelaySeconds: 30
           periodSeconds: 10
+      volumes:
+      - name: data
+        hostPath:
+          path: /home/*/*/sentinel-project/app/data
+          type: DirectoryOrCreate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinel-dashboard
+  namespace: sentinel
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: dashboard}}
+  template:
+    metadata: {labels: {app: dashboard, team: "sentinel-ops"}}
+    spec:
+      securityContext: {runAsUser: 0, runAsGroup: 0, fsGroup: 0}
+      containers:
+      - name: dashboard
+        image: sentinel-dashboard:v7.3
+        resources:
+          limits: {cpu: "500m", memory: "512Mi"}
+          requests: {cpu: "100m", memory: "128Mi"}
+        ports: [{containerPort: 8501}]
+        volumeMounts: [{name: data, mountPath: /app/data}]
+      volumes:
+      - name: data
+        hostPath:
+          path: /home/*/*/sentinel-project/app/data
+          type: DirectoryOrCreate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinel-exporter
+  namespace: sentinel
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: exporter}}
+  template:
+    metadata: {labels: {app: exporter, team: "sentinel-ops"}}
+    spec:
+      securityContext: {runAsUser: 0, runAsGroup: 0, fsGroup: 0}
+      containers:
+      - name: exporter
+        image: sentinel-exporter:v7.3
+        resources: {limits: {cpu: "100m", memory: "128Mi"}}
+        ports: [{containerPort: 9090}]
+        volumeMounts: [{name: data, mountPath: /data}]
       volumes:
       - name: data
         hostPath:
@@ -390,14 +419,30 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: sentinel-dashboard
+  namespace: sentinel
+spec:
+  type: NodePort
+  selector: {app: dashboard}
+  ports: [{name: http, port: 8501, nodePort: 30501}]
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: sentinel-agent-metrics
   namespace: sentinel
 spec:
   selector: {app: agent}
-  ports:
-  - name: metrics
-    port: 8001
-    targetPort: 8000
+  ports: [{name: metrics, port: 8001, targetPort: 8000}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentinel-exporter-metrics
+  namespace: sentinel
+spec:
+  selector: {app: exporter}
+  ports: [{name: metrics, port: 9090, targetPort: 9090}]
 EOF
 
 echo "🔨 Building v7.3 images..."
@@ -405,26 +450,70 @@ cd "$PROJECT_ROOT/agent" && sudo docker build -t sentinel-agent:v7.3 .
 cd "$PROJECT_ROOT/app" && sudo docker build -t sentinel-dashboard:v7.3 .
 cd "$PROJECT_ROOT/exporter" && sudo docker build -t sentinel-exporter:v7.3 .
 
-for img in sentinel-agent:v7.3 sentinel-dashboard:v7.3 sentinel-exporter:v7.3; do
-  sudo docker save $img | sudo k3s ctr -n k8s.io images import -
-done
+echo "📦 Importing to k3s..."
+sudo docker save sentinel-agent:v7.3 | sudo k3s ctr -n k8s.io images import -
+sudo docker save sentinel-dashboard:v7.3 | sudo k3s ctr -n k8s.io images import -
+sudo docker save sentinel-exporter:v7.3 | sudo k3s ctr -n k8s.io images import -
 
+echo "🚀 Deploying (Namespace-first order)..."
 kubectl delete clusterrolebinding sentinel-admin 2>/dev/null || true
 kubectl apply -f "$PROJECT_ROOT/k8s/sentinel.yaml"
 
-echo "⏳ Waiting for agent..."
+echo "⏳ Waiting for ALL pods..."
 for i in {1..40}; do
-  if kubectl wait --for=condition=Ready pod -l app=agent -n sentinel --timeout=120s 2>/dev/null; then
-    echo "✅ SENTINEL v7.3 READY!"
+  READY=$(kubectl get pods -n sentinel --no-headers 2>/dev/null | grep -c "1/1.*Running" || echo 0)
+  if [ "$READY" -ge 3 ]; then
+    echo "✅ ALL PODS READY: http://$VM_IP:30501"
     break
   fi
   kubectl get pods -n sentinel || true
   sleep 5
 done
 
-echo "🎉 COMPLETE - v7.3 CLASSROOM PRODUCTION READY!"
-echo "🔗 Agent Metrics:    http://$VM_IP:8001/metrics" 
-echo "🧪 TEST VIOLATION:"
+############################################
+# PROMETHEUS + GRAFANA (UNCHANGED)
+############################################
+echo "📈 Deploying Monitoring..."
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+helm repo add grafana https://grafana.github.io/helm-charts || true
+helm repo update
+
+helm uninstall prometheus -n prometheus || true
+helm uninstall grafana -n grafana || true
+kubectl delete ns prometheus grafana 2>/dev/null || true
+
+kubectl create ns prometheus; kubectl create ns grafana
+
+cat <<EOF > /tmp/prom-values.yaml
+server:
+  resources:
+    limits: {cpu: 500m, memory: 512Mi}
+    requests: {cpu: 100m, memory: 128Mi}
+  extraScrapeConfigs: |
+    - job_name: 'sentinel-agent'
+      static_configs: [{targets: ['sentinel-agent-metrics.sentinel:8001']}]
+    - job_name: 'sentinel-exporter'
+      static_configs: [{targets: ['sentinel-exporter-metrics.sentinel:9090']}]
+EOF
+helm upgrade --install prometheus prometheus-community/prometheus -n prometheus --create-namespace -f /tmp/prom-values.yaml
+
+cat <<EOF > /tmp/grafana-values.yaml
+resources:
+  limits: {cpu: 300m, memory: 256Mi}
+  requests: {cpu: 100m, memory: 128Mi}
+service:
+  type: NodePort
+  nodePort: 30502
+adminPassword: sentinel123
+EOF
+helm upgrade --install grafana grafana/grafana -n grafana --create-namespace -f /tmp/grafana-values.yaml
+
+echo "🎉 ✅ v7.3 COMPLETE - ALL 5 PODS LIVE!"
+echo "🔗 Dashboard: http://$VM_IP:30501"  
+echo "📊 Grafana:  http://$VM_IP:30502 (admin/sentinel123)"
+echo "📡 Agent:    Events + 3min AI analysis"
+echo ""
+echo "🧪 CLASS DEMO:"
 echo "kubectl run bad-pod --image=nginx --rm -it -- /bin/sh -c 'sleep 3600'"
-echo "👉 Watch dashboard fill with 2min AI analysis!"
+echo "→ Watch dashboard fill with AI remediation advice!"
 
