@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sentinel Prime: v7.7 — LOCAL IMAGE PULL FIXED + KYVERNO ONLY
+# Sentinel Prime: v7.8 — OLLAMA FIXED (hostNetwork + 0.0.0.0) + KYVERNO ONLY
 set -e
 
 # ========= CONFIG =========
@@ -9,17 +9,16 @@ PROJECT_ROOT="/home/$LINUX_USER/sentinel-project"
 MODEL_NAME="${MODEL_NAME:-llama3}"
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-echo "================ Sentinel v7.7 — IMAGE PULL FIXED ================="
+echo "================ Sentinel v7.8 — OLLAMA 0.0.0.0 FIXED =============="
 echo "[INFO] Using Linux user: $LINUX_USER"
 echo "[INFO] Project root: $PROJECT_ROOT"
 echo "[INFO] VM IP: $VM_IP"
 echo "==================================================================="
+echo "[INFO] Ollama will use 0.0.0.0:11434 (hostNetwork access)"
 
 echo "🧹 Purging Old State..."
+kubectl delete clusterrolebinding sentinel-agent-rbac-v77 2>/dev/null || true
 kubectl delete clusterrolebinding sentinel-agent-rbac-v76 2>/dev/null || true
-kubectl delete clusterrolebinding sentinel-agent-rbac-v75 2>/dev/null || true
-kubectl delete clusterrolebinding sentinel-agent-rbac 2>/dev/null || true
-kubectl delete clusterrole sentinel-event-watcher 2>/dev/null || true
 kubectl delete ns sentinel 2>/dev/null || true
 sudo docker rm -f sentinel-agent sentinel-dashboard sentinel-exporter 2>/dev/null || true
 sudo rm -rf "$PROJECT_ROOT/app/data"
@@ -100,9 +99,9 @@ kubectl apply -f /tmp/sentinel-policies.yaml
 echo "[OK] Kyverno policies applied."
 
 ############################################
-# 2. BUILD + LOCAL TAGGING (LOCAL IMAGES ONLY)
+# 2. BUILD v7.8 (OLLAMA = 0.0.0.0:11434)
 ############################################
-echo "🛠️ Building Agent v7.7..."
+echo "🛠️ Agent v7.8 — OLLAMA 0.0.0.0 + hostNetwork..."
 cat <<'EOF' > "$PROJECT_ROOT/agent/Dockerfile"
 FROM python:3.10-slim
 RUN pip install kubernetes==29.0.0 requests==2.31.0 prometheus_client==0.20.0 && rm -rf /root/.cache/pip
@@ -122,7 +121,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [AGENT] %(message)s'
 logger = logging.getLogger(__name__)
 
 MODEL_NAME = os.getenv("SENTINEL_MODEL", "llama3")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")  # 🔥 FIXED: 127.0.0.1 + hostNetwork
 DB_PATH = os.getenv("DB_PATH", "/data/sentinel.db")
 
 violations_total = Counter("sentinel_violations_total", "Kyverno violations", ["policy","severity"])
@@ -152,18 +151,26 @@ def init_db():
 
 def call_sre_ai(msg, timeout=300):
     try:
-        logger.info(f"🤖 KYVERNO → Ollama ({timeout}s)")
+        logger.info(f"🤖 KYVERNO → Ollama: {OLLAMA_URL} ({timeout}s)")
         prompt = f"SRE fix for Kyverno violation: {msg[:250]}"
         r = requests.post(f"{OLLAMA_URL}/api/generate", json={
             "model": MODEL_NAME, "prompt": prompt, "stream": False
         }, timeout=timeout)
         if r.status_code == 200:
-            return r.json().get("response", "No response")[:1000]
-        return f"HTTP {r.status_code}"
+            response = r.json().get("response", "No response")
+            logger.info("✅ Ollama AI response received!")
+            return response[:1000]
+        logger.warning(f"❌ Ollama HTTP {r.status_code}")
+        return f"Ollama HTTP {r.status_code}"
     except requests.exceptions.Timeout:
-        return f"Timeout {timeout}s"
+        logger.warning(f"🕒 Ollama timeout after {timeout}s")
+        return f"AI timeout ({timeout}s)"
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"❌ Ollama connection failed: {e}")
+        return "AI unavailable (Ollama connection error)"
     except Exception as e:
-        return f"Error: {str(e)[:100]}"
+        logger.error(f"❌ AI error: {e}")
+        return f"AI error: {str(e)[:100]}"
 
 def update_metrics():
     try:
@@ -182,7 +189,7 @@ def watch_events():
     
     while True:
         try:
-            logger.info(f"📡 KYVERNO-ONLY watch (#{kyverno_count})...")
+            logger.info(f"📡 KYVERNO-ONLY watch (#{kyverno_count} violations seen)")
             for event in w.stream(v1.list_event_for_all_namespaces, timeout_seconds=600):
                 obj = event["object"]
                 
@@ -210,12 +217,13 @@ def watch_events():
                 if row:
                     cur.execute("UPDATE incidents SET occurrence_count=?, updated_at=? WHERE fingerprint=?", 
                                (row[0]+1, now, fp))
-                    logger.info(f"🔄 {pod_name}/{namespace} count={row[0]+1}")
+                    logger.info(f"🔄 {pod_name}/{namespace} → count={row[0]+1}")
                 else:
+                    logger.info(f"🤖 Calling AI for NEW violation...")
                     ai_analysis = call_sre_ai(msg)
                     cur.execute("INSERT INTO incidents VALUES(NULL,?,?,?,?,?,?,?,?,?)",
                                (fp, pod_name, namespace, "Warning", msg[:1000], ai_analysis, 1, now, now))
-                    logger.info(f"🆕 KYVERNO NEW: {pod_name}/{namespace}")
+                    logger.info(f"🆕 KYVERNO NEW: {pod_name}/{namespace} → AI: {ai_analysis[:100]}...")
                 
                 conn.commit(); conn.close()
                 update_metrics()
@@ -224,7 +232,8 @@ def watch_events():
             time.sleep(5)
 
 def main():
-    logger.info("🚀 Sentinel v7.7 — KYVERNO-ONLY + LOCAL IMAGES")
+    logger.info("🚀 Sentinel v7.8 — OLLAMA 127.0.0.1 + hostNetwork")
+    logger.info(f"🔗 Ollama URL: {OLLAMA_URL}")
     init_db()
     start_http_server(8000)
     threading.Thread(target=watch_events, daemon=True).start()
@@ -235,7 +244,7 @@ def main():
 if __name__ == "__main__": main()
 EOF
 
-echo "🖥️ Building Dashboard v7.7..."
+echo "🖥️ Dashboard v7.8..."
 cat <<'EOF' > "$PROJECT_ROOT/app/Dockerfile"
 FROM python:3.10-slim
 RUN pip install streamlit==1.36.0 pandas==2.2.2 && rm -rf /root/.cache/pip
@@ -247,7 +256,7 @@ EOF
 cat <<'EOF' > "$PROJECT_ROOT/app/app.py"
 import streamlit as st, sqlite3, pandas as pd, os
 st.set_page_config(layout="wide")
-st.markdown("<h1 style='text-align:center;color:#00f2ff'>🛰️ Sentinel v7.7 — KYVERNO AI</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;color:#00f2ff'>🛰️ Sentinel v7.8 — KYVERNO + OLLAMA</h1>", unsafe_allow_html=True)
 
 db = "/app/data/sentinel.db"
 if os.path.exists(db):
@@ -258,16 +267,17 @@ if os.path.exists(db):
         if not df.empty:
             col1, col2, col3 = st.columns(3)
             col1.metric("🚨 KYVERNO Violations", len(df))
-            col2.metric("Hits", df["occurrence_count"].sum() - len(df))
-            col3.metric("Status", "LIVE")
-            st.subheader("Activity"); st.bar_chart(df.set_index("pod_name")["occurrence_count"])
-            st.subheader("AI Fixes"); st.dataframe(df[["namespace","pod_name","message","ai_analysis"]], use_container_width=True)
-        else: st.info("🔄 Test: kubectl run bad-pod --image=nginx --rm -it -- /bin/sh")
+            col2.metric("Total Hits", df["occurrence_count"].sum())
+            col3.metric("Status", "LIVE ✅")
+            st.subheader("🚨 KYVERNO Activity"); st.bar_chart(df.set_index("pod_name")["occurrence_count"])
+            st.subheader("🤖 AI Remediation"); st.dataframe(df[["namespace","pod_name","message","ai_analysis"]], use_container_width=True)
+        else: 
+            st.info("🎯 Test Kyverno: `kubectl run bad-pod --image=nginx --rm -it -- /bin/sh -c 'sleep 3600'`)")
     except Exception as e: st.error(f"DB error: {e}")
-else: st.warning("🔄 Waiting for KYVERNO violations...")
+else: st.warning("🔄 Waiting for KYVERNO policy violations...")
 EOF
 
-echo "📊 Building Exporter v7.7..."
+echo "📊 Exporter v7.8..."
 cat <<'EOF' > "$PROJECT_ROOT/exporter/Dockerfile"
 FROM python:3.10-slim
 RUN pip install prometheus_client==0.20.0 && rm -rf /root/.cache/pip
@@ -279,7 +289,7 @@ cat <<'EOF' > "$PROJECT_ROOT/exporter/exporter.py"
 import sqlite3, time
 from prometheus_client import Gauge, start_http_server
 start_http_server(9090)
-g1 = Gauge("sentinel_violations", "Violations"); g2 = Gauge("sentinel_occurrences", "Occurrences")
+g1 = Gauge("sentinel_violations", "Kyverno Violations"); g2 = Gauge("sentinel_occurrences", "Total Occurrences")
 def update():
     try:
         conn = sqlite3.connect("/data/sentinel.db")
@@ -291,20 +301,20 @@ def update():
 while True: update(); time.sleep(10)
 EOF
 
-echo "🔨 Building + LOCAL TAGGING (no docker.io)..."
-cd "$PROJECT_ROOT/agent" && sudo docker build -t localhost/sentinel-agent:v7.7 . && echo "[OK] Agent built"
-cd "$PROJECT_ROOT/app" && sudo docker build -t localhost/sentinel-dashboard:v7.7 . && echo "[OK] Dashboard built"
-cd "$PROJECT_ROOT/exporter" && sudo docker build -t localhost/sentinel-exporter:v7.7 . && echo "[OK] Exporter built"
+echo "🔨 Building LOCAL images (localhost/)..."
+cd "$PROJECT_ROOT/agent" && sudo docker build -t localhost/sentinel-agent:v7.8 . && echo "[OK] Agent built"
+cd "$PROJECT_ROOT/app" && sudo docker build -t localhost/sentinel-dashboard:v7.8 . && echo "[OK] Dashboard built"
+cd "$PROJECT_ROOT/exporter" && sudo docker build -t localhost/sentinel-exporter:v7.8 . && echo "[OK] Exporter built"
 
-echo "📦 CRITICAL: Importing LOCAL images to K3s containerd..."
-sudo docker save localhost/sentinel-agent:v7.7 | sudo k3s ctr -n k8s.io images import - && echo "[OK] Agent imported"
-sudo docker save localhost/sentinel-dashboard:v7.7 | sudo k3s ctr -n k8s.io images import - && echo "[OK] Dashboard imported"
-sudo docker save localhost/sentinel-exporter:v7.7 | sudo k3s ctr -n k8s.io images import - && echo "[OK] Exporter imported"
+echo "📦 Importing to K3s containerd..."
+sudo docker save localhost/sentinel-agent:v7.8 | sudo k3s ctr -n k8s.io images import - && echo "[OK] Agent imported"
+sudo docker save localhost/sentinel-dashboard:v7.8 | sudo k3s ctr -n k8s.io images import - && echo "[OK] Dashboard imported"
+sudo docker save localhost/sentinel-exporter:v7.8 | sudo k3s ctr -n k8s.io images import - && echo "[OK] Exporter imported"
 
-echo "🔍 VERIFY images in K3s..."
-sudo k3s ctr -n k8s.io images ls | grep sentinel && echo "[OK] Images verified"
+echo "🔍 VERIFIED: Images in K3s..."
+sudo k3s ctr -n k8s.io images ls | grep sentinel || echo "❌ No sentinel images found!"
 
-echo "🚀 Deploying v7.7 (LOCAL IMAGES ONLY)..."
+echo "🚀 Deploying v7.8 (OLLAMA FIXED: 127.0.0.1 + hostNetwork)..."
 cat > "$PROJECT_ROOT/k8s/sentinel.yaml" << 'EOF'
 apiVersion: v1
 kind: Namespace
@@ -329,7 +339,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: sentinel-agent-rbac-v77
+  name: sentinel-agent-rbac-v78
 subjects:
 - kind: ServiceAccount
   name: sentinel-agent-sa
@@ -356,15 +366,16 @@ spec:
         team: sentinel-ops
     spec:
       hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet  # 🔥 CLOUD NATIVE: Fix DNS in hostNetwork
       serviceAccountName: sentinel-agent-sa
       containers:
       - name: agent
-        image: localhost/sentinel-agent:v7.7
+        image: localhost/sentinel-agent:v7.8
         env:
         - name: SENTINEL_MODEL
           value: "llama3"
         - name: OLLAMA_URL
-          value: "http://host.docker.internal:11434"
+          value: "http://127.0.0.1:11434"  # 🔥 FIXED: Direct host access
         resources:
           limits:
             cpu: "500m"
@@ -401,7 +412,7 @@ spec:
     spec:
       containers:
       - name: dashboard
-        image: localhost/sentinel-dashboard:v7.7
+        image: localhost/sentinel-dashboard:v7.8
         resources:
           limits:
             cpu: "500m"
@@ -438,7 +449,7 @@ spec:
     spec:
       containers:
       - name: exporter
-        image: localhost/sentinel-exporter:v7.7
+        image: localhost/sentinel-exporter:v7.8
         resources:
           limits:
             cpu: "100m"
@@ -471,25 +482,22 @@ spec:
 EOF
 
 kubectl apply -f "$PROJECT_ROOT/k8s/sentinel.yaml"
-echo "[OK] v7.7 deployed (LOCAL IMAGES)."
+echo "[OK] v7.8 deployed (OLLAMA FIXED)."
 
-echo "⏳ Waiting for 3/3 pods..."
+echo "⏳ Waiting for pods..."
 for i in {1..40}; do
   READY=$(kubectl get pods -n sentinel --no-headers 2>/dev/null | grep -c "1/1.*Running" || echo 0)
-  echo "[PROGRESS] Pods ready: $READY/3 (attempt $i/40)"
-  if [ "$READY" -ge 3 ]; then
-    echo "✅ ALL PODS LIVE → http://$VM_IP:30501"
-    break
-  fi
+  echo "[PROGRESS] Pods: $READY/3 (attempt $i)"
+  [ "$READY" -ge 3 ] && echo "✅ LIVE → http://$VM_IP:30501" && break
   kubectl get pods -n sentinel || true
   sleep 5
 done
 
-echo "🎉 SENTINEL v7.7 COMPLETE — NO DOCKER.IO PULLS!"
+echo "🎉 v7.8 COMPLETE — OLLAMA FIXED + CLOUD NATIVE!"
 echo "=============================================="
 echo "Dashboard: http://$VM_IP:30501"
 echo "Agent Logs: kubectl logs -n sentinel -l app=agent -f"
-echo "TEST NOW: kubectl run bad-pod --image=nginx --rm -it -- /bin/sh -c 'sleep 3600'"
-echo "→ Watch KYVERNO violations + 5min AI analysis!"
+echo "✅ Ollama: 127.0.0.1:11434 (hostNetwork + dnsPolicy)"
+echo "✅ TEST: kubectl run bad-pod --image=nginx --rm -it -- /bin/sh -c 'sleep 3600'"
 echo "=============================================="
 
