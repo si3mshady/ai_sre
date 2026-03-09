@@ -1,0 +1,95 @@
+version: "3.9"
+
+networks:
+  eventnet:
+
+services:
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.3.10
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    networks:
+      - eventnet
+
+
+  console:
+    image: docker.redpanda.com/redpandadata/console:v3.5.3
+    ports:
+      - "8080:8080"
+    networks:
+      - eventnet
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    networks:
+      - eventnet
+
+
+  edge-producer:
+    image: python:3.11
+    volumes:
+      - ./producer:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install kafka-python &&
+             python edge_device.py"
+    depends_on:
+      - redpanda
+    networks:
+      - eventnet
+
+
+  ai-agent:
+    image: python:3.11
+    volumes:
+      - ./agents:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install kafka-python fastapi uvicorn requests &&
+             python ai_agent.py"
+    depends_on:
+      - redpanda
+      - ollama
+    networks:
+      - eventnet
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+
+  dashboard:
+    image: python:3.11
+    volumes:
+      - ./dashboard:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install kafka-python streamlit pandas &&
+             streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0"
+    ports:
+      - "8501:8501"
+    depends_on:
+      - redpanda
+    networks:
+      - eventnet
+
+
+volumes:
+  ollama:

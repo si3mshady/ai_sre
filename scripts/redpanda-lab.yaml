@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+spec:
+  serviceName: redpanda
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      containers:
+      - name: redpanda
+        image: docker.redpanda.com/redpandadata/redpanda:latest
+        args:
+        - redpanda
+        - start
+        - --overprovisioned
+        - --smp=1
+        - --memory=1G
+        - --reserve-memory=0M
+        - --node-id=0
+        - --check=false
+        - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+        - --advertise-kafka-addr=PLAINTEXT://localhost:9092
+        ports:
+        - containerPort: 9092
+          name: kafka
+        - containerPort: 9644
+          name: admin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+spec:
+  clusterIP: None
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: kafka
+  - port: 9644
+    targetPort: 9644
+    name: admin
+  selector:
+    app: redpanda
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda-external
+spec:
+  type: NodePort
+  ports:
+  - port: 9092
+    targetPort: 9092
+    nodePort: 30992
+    name: kafka
+  selector:
+    app: redpanda
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      initContainers:
+      - name: install
+        image: python:3.11-slim
+        command: ["pip", "install", "kafka-python"]
+      containers:
+      - name: producer
+        image: python:3.11-slim
+        command: ["python", "-c"]
+        args:
+        - |
+          from kafka import KafkaProducer
+          import json,time,random,os
+          producer = KafkaProducer(bootstrap_servers=["redpanda-external:9092"],value_serializer=lambda v: json.dumps(v).encode())
+          print("Producer connected")
+          while True:
+            event={"temperature":random.randint(20,40),"cpu":random.randint(0,100),"memory":random.randint(0,100),"time":time.time()}
+            producer.send("demo-events",event)
+            print("sent",event)
+            time.sleep(1)
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "redpanda-external:9092"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      initContainers:
+      - name: install
+        image: python:3.11-slim
+        command: ["pip", "install", "streamlit", "kafka-python", "pandas"]
+      containers:
+      - name: dashboard
+        image: python:3.11-slim
+        command: ["streamlit", "run"]
+        args:
+        - |
+          import streamlit as st
+          from kafka import KafkaConsumer
+          import json,pandas as pd,os,time
+          st.title("Redpanda Streaming Dashboard")
+          consumer=KafkaConsumer("demo-events",bootstrap_servers=["redpanda-external:9092"],value_deserializer=lambda x:json.loads(x.decode()),auto_offset_reset="latest",group_id="dashboard-group")
+          if "data" not in st.session_state: st.session_state.data = []
+          placeholder = st.empty()
+          for msg in consumer:
+            event = msg.value
+            st.session_state.data.append(event)
+            df = pd.DataFrame(st.session_state.data[-100:])
+            with placeholder.container():
+              st.subheader("Latest Event")
+              st.json(event)
+              if len(df) > 1:
+                st.subheader("Trends")
+                st.line_chart(df[["temperature","cpu","memory"]])
+        ports:
+        - containerPort: 8501
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "redpanda-external:9092"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+spec:
+  type: NodePort
+  ports:
+  - port: 8501
+    targetPort: 8501
+    nodePort: 32501
+  selector:
+    app: dashboard

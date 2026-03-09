@@ -1,0 +1,13 @@
+replicaCount: 1  # Single broker for MVP
+storage:
+  persistentVolume:
+    size: 10Gi
+external:
+  enabled: true
+  type: NodePort
+console:
+  enabled: true
+statefulset:
+  initContainers:
+    setDataDirOwnership:
+      enabled: true
