@@ -36,6 +36,12 @@ services:
 
   ollama:
     image: ollama/ollama
+    command: >
+      serve &
+      sleep 10 &&
+      ollama pull llama3.2:3b &&
+      wait
+        
     ports:
       - "11434:11434"
     volumes:
