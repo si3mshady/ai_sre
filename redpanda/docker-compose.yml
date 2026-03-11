@@ -100,5 +100,27 @@ services:
     networks:
       - eventnet
 
+
+  flink-jobmanager:
+    image: flink:1.19-scala_2.12
+    container_name: flink-jobmanager
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    networks:
+      - eventnet
+
+  flink-taskmanager:
+    image: flink:1.19-scala_2.12
+    container_name: flink-taskmanager
+    command: taskmanager
+    depends_on:
+      - flink-jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    networks:
+      - eventnet        
 volumes:
   ollama:
