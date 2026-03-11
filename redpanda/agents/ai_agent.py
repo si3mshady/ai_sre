@@ -25,9 +25,9 @@ Is this a safety issue?
 
     try:
         r = requests.post(
-            "http://host.docker.internal:11434/api/generate",
+            "http://ollama:11434/api/generate",
             json={
-                "model": "llama3.2:3b",
+                "model": "llama3:latest",
                 "prompt": prompt,
                 "stream": False
             },

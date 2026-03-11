@@ -23,7 +23,6 @@ services:
     networks:
       - eventnet
 
-
   console:
     image: docker.redpanda.com/redpandadata/console:v3.5.3
     ports:
@@ -33,22 +32,27 @@ services:
     environment:
       KAFKA_BROKERS: redpanda:9092
 
-
   ollama:
+    container_name: ollama
     image: ollama/ollama
-    command: >
-      serve &
-      sleep 10 &&
-      ollama pull llama3.2:3b &&
-      wait
-        
+    # Keeping your existing command structure intact
+    command: serve #&
+      #sleep 10 &&
+      #ollama pull llama3.2:3b &&
+      #wait
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
-      - ollama:/root/.ollama
+      - ~/.ollama:/root/.ollama
     networks:
       - eventnet
-
+    # Healthcheck to verify the model is actually present on disk
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q 'llama3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5 # Up to ~6.5 minutes for CPU-only downloads
+      start_period: 15s
 
   edge-producer:
     image: python:3.11
@@ -63,7 +67,6 @@ services:
     networks:
       - eventnet
 
-
   ai-agent:
     image: python:3.11
     volumes:
@@ -73,13 +76,14 @@ services:
       sh -c "pip install kafka-python fastapi uvicorn requests &&
              python ai_agent.py"
     depends_on:
-      - redpanda
-      - ollama
+      redpanda:
+        condition: service_started
+      ollama:
+        condition: service_healthy # This forces the agent to wait for the download
     networks:
       - eventnet
     extra_hosts:
     - "host.docker.internal:host-gateway"
-
 
   dashboard:
     image: python:3.11
@@ -95,7 +99,6 @@ services:
       - redpanda
     networks:
       - eventnet
-
 
 volumes:
   ollama:
