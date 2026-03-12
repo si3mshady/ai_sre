@@ -1,27 +1,61 @@
 from pyflink.datastream import StreamExecutionEnvironment
-
-env = StreamExecutionEnvironment.get_execution_environment()
-
-# Instead of from_collection, read from Redpanda/Kafka directly
-from pyflink.datastream.connectors import FlinkKafkaConsumer
+from pyflink.datastream.connectors.kafka import FlinkKafkaConsumer, FlinkKafkaProducer
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.typeinfo import Types
+import json
 
-kafka_props = {'bootstrap.servers': 'redpanda:9092', 'group.id': 'flink-demo'}
+
+def enrich_event(event):
+
+    risk_score = {"low": 1, "medium": 3, "high": 5}.get(event.get("risk_level"), 1)
+
+    correlation_flag = False
+    if event.get("risk_level") == "high" and event.get("previous_zone") == event.get("zone"):
+        correlation_flag = True
+
+    event["safety_score"] = risk_score
+    event["suspicious_activity"] = correlation_flag
+
+    return json.dumps(event)
+
+
+env = StreamExecutionEnvironment.get_execution_environment()
+env.set_parallelism(1)
+
+
+kafka_props = {
+    "bootstrap.servers": "redpanda:9092",
+    "group.id": "flink-enricher"
+}
+
 
 consumer = FlinkKafkaConsumer(
-    topics='construction.events',
+    topics="construction.events",
     deserialization_schema=SimpleStringSchema(),
     properties=kafka_props
 )
 
-ds = env.add_source(consumer)
+# IMPORTANT
+consumer.set_start_from_earliest()
 
-# basic map to parse JSON
-import json
-ds = ds.map(lambda x: json.loads(x), output_type=Types.MAP(Types.STRING(), Types.STRING()))
 
-# print for demo purposes
-ds.print()
+producer = FlinkKafkaProducer(
+    topic="construction.enriched",
+    serialization_schema=SimpleStringSchema(),
+    producer_config={"bootstrap.servers": "redpanda:9092"}
+)
 
-env.execute("Construction Stream Processor")
+
+stream = env.add_source(consumer)
+
+
+enriched_stream = stream.map(
+    lambda x: enrich_event(json.loads(x)),
+    output_type=Types.STRING()
+)
+
+
+enriched_stream.add_sink(producer)
+
+
+env.execute("Construction Enrichment Stream")

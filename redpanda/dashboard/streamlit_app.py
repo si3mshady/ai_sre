@@ -4,22 +4,47 @@ import json
 
 st.title("Construction AI Monitoring")
 
-consumer=KafkaConsumer(
- "construction.analysis",
- bootstrap_servers="redpanda:9092",
- value_deserializer=lambda x: json.loads(x.decode())
+analysis_consumer = KafkaConsumer(
+    "construction.analysis",
+    bootstrap_servers="redpanda:9092",
+    value_deserializer=lambda x: json.loads(x.decode()),
+    auto_offset_reset="latest"
 )
 
-placeholder=st.empty()
+enriched_consumer = KafkaConsumer(
+    "construction.enriched",
+    bootstrap_servers="redpanda:9092",
+    value_deserializer=lambda x: json.loads(x.decode()),
+    auto_offset_reset="latest"
+)
 
-for msg in consumer:
+analysis_placeholder = st.empty()
+flink_placeholder = st.empty()
 
- data=msg.value
+while True:
 
- with placeholder.container():
+    analysis_msg = next(analysis_consumer)
+    enriched_msg = next(enriched_consumer)
 
-  st.subheader("Latest Event")
-  st.json(data["event"])
+    analysis = analysis_msg.value
+    enriched = enriched_msg.value
 
-  st.subheader("AI Analysis")
-  st.write(data["analysis"])
+    with analysis_placeholder.container():
+
+        st.subheader("AI Event Analysis")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("### Event")
+            st.json(analysis["event"])
+
+        with col2:
+            st.markdown("### AI Safety Reasoning")
+            st.write(analysis["analysis"])
+
+    with flink_placeholder.container():
+
+        st.subheader("Flink Stream Enrichment")
+
+        st.json(enriched)
