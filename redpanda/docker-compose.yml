@@ -102,9 +102,19 @@ services:
 
 
   flink-jobmanager:
-    image: flink:1.19-scala_2.12
+    build:
+      context: .
+      dockerfile: Dockerfile.flink
+    #image: flink:1.19-scala_2.12
     container_name: flink-jobmanager
     command: jobmanager
+    #command: >
+    # bash -c "
+    # /docker-entrypoint.sh jobmanager &
+    #      sleep 15 &&
+    # flink run -py /opt/flink/jobs/process_events.py"
+    volumes:
+    - ./flink_jobs:/opt/flink/jobs  
     ports:
       - "8081:8081"
     environment:
@@ -113,8 +123,14 @@ services:
       - eventnet
 
   flink-taskmanager:
-    image: flink:1.19-scala_2.12
+    build:
+      context: .
+      dockerfile: Dockerfile.flink
+    #image: flink:1.19-scala_2.12
+
     container_name: flink-taskmanager
+    volumes:
+    - ./flink_jobs:/opt/flink/jobs  
     command: taskmanager
     depends_on:
       - flink-jobmanager

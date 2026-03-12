@@ -1,0 +1,29 @@
+# Dockerfile.flink
+FROM flink:1.19-scala_2.12
+
+USER root
+
+# Install Python + pip + PyFlink + Kafka Python client
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip wget && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    pip3 install --no-cache-dir apache-flink kafka-python && \
+    apt-get clean
+
+# Copy your downloaded Kafka connector JAR into Flink lib
+COPY ./flink_libs/flink-connector-kafka-3.3.0-1.19.jar /opt/flink/lib/
+
+
+
+# Download Flink Kafka connector and Kafka clients directly into lib
+RUN wget -O /opt/flink/lib/flink-connector-kafka-3.3.0-1.19.jar \
+    https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/3.3.0-1.19/flink-connector-kafka-3.3.0-1.19.jar && \
+    wget -O /opt/flink/lib/kafka-clients-3.5.1.jar \
+    https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.5.1/kafka-clients-3.5.1.jar
+
+
+
+USER flink
+
+# Optional: Set working dir for jobs
+WORKDIR /opt/flink/jobs
