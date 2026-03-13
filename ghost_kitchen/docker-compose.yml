@@ -1,0 +1,110 @@
+version: "3.9"
+
+networks:
+  kitchen-net:
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.3.10
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    networks:
+      - kitchen-net
+
+  ollama:
+    container_name: ollama
+    image: ollama/ollama
+    command: serve
+    ports:
+      - "11435:11434"
+    volumes:
+      - ~/.ollama:/root/.ollama
+    networks:
+      - kitchen-net
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q 'llama3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  kitchen-producer:
+    image: python:3.11-slim
+    volumes:
+      - ./producer:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir kafka-python &&
+             python kitchen_producer.py"
+    depends_on:
+      - redpanda
+    networks:
+      - kitchen-net
+
+  flink-jobmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile.flink
+    container_name: flink-jobmanager
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    volumes:
+      - ./flink_jobs:/opt/flink/jobs
+    networks:
+      - kitchen-net
+
+  flink-taskmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile.flink
+    container_name: flink-taskmanager
+    command: taskmanager
+    depends_on:
+      - flink-jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    networks:
+      - kitchen-net
+
+  kitchen-agent:
+    image: python:3.11-slim
+    volumes:
+      - ./agents:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir kafka-python langgraph langchain-community langchain-ollama &&
+             python kitchen_agent.py"
+    depends_on:
+      ollama:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+    networks:
+      - kitchen-net
+
+  dashboard:
+    image: python:3.11-slim
+    volumes:
+      - ./dashboard:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir kafka-python streamlit pandas &&
+             streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0"
+    ports:
+      - "8501:8501"
+    depends_on:
+      - redpanda
+    networks:
+      - kitchen-net
