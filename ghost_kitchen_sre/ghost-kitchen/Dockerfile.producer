@@ -1,0 +1,4 @@
+FROM python:3.11-slim
+RUN pip install kafka-python pyyaml prometheus-client
+WORKDIR /app
+COPY producer/*.py ./

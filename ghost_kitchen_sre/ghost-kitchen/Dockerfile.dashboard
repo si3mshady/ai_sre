@@ -1,0 +1,4 @@
+FROM python:3.11-slim
+RUN pip install streamlit pandas kafka-python plotly
+WORKDIR /app
+COPY dashboard/*.py ./
