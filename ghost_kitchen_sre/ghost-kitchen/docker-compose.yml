@@ -13,6 +13,7 @@ volumes:
 
 services:
   redpanda:
+    container_name: redpanda
     image: docker.redpanda.com/redpandadata/redpanda:v25.3.10
     command:
       - redpanda start
@@ -53,11 +54,14 @@ services:
       - kitchen-net
 
   ollama:
+    container_name: ollama
     image: ollama/ollama:latest
     ports:
       - "11436:11434"
     volumes:
-      - ollama_data:/root/.ollama
+      - ~/.ollama:/root/.ollama    
+   # volumes:
+   #  - ollama_data:/root/.ollama
     networks:
       - kitchen-net
     healthcheck:
@@ -122,6 +126,7 @@ services:
     command: taskmanager
 
   kitchen-agent:
+    container_name: kitchen-agent
     build:
       context: .
       dockerfile: Dockerfile.agent
