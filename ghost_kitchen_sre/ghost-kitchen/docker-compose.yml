@@ -75,12 +75,15 @@ services:
           memory: 3g
 
   kitchen-producer:
+    command: ["sh", "-c", "sleep 20 && echo '✅ Starting after 20s delay' && python kitchen_producer.py"]
+
+    container_name: kitchen-producer
     build: 
       context: .
       dockerfile: Dockerfile.producer
     volumes:
       - ./producer:/app
-      - ./config:/app/config:ro
+      - ./config:/app/config
     environment:
       - TENANT_ID=tenant1
       - BOOTSTRAP_SERVERS=redpanda:9092
@@ -95,10 +98,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512m
+          cpus: "2"
+          memory: 3g
 
   flink-jobmanager:
+    container_name: jobmanager
     build:
       context: .
       dockerfile: Dockerfile.flink
@@ -111,9 +115,10 @@ services:
       - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
     networks:
       - kitchen-net
-    command: jobmanager
+    command: ["jobmanager" ]
 
   flink-taskmanager:
+    command: ["taskmanager" ]
     build:
       context: .
       dockerfile: Dockerfile.flink
@@ -123,7 +128,7 @@ services:
       - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
     networks:
       - kitchen-net
-    command: taskmanager
+    
 
   kitchen-agent:
     container_name: kitchen-agent

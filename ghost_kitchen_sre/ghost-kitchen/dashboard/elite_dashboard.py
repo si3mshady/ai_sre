@@ -103,4 +103,4 @@ with tab4:
 
 # Simple auto-refresh using Streamlit's rerun pattern
 time.sleep(refresh_interval)
-st.experimental_rerun()
+st.rerun()

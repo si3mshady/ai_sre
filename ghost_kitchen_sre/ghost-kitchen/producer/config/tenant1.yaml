@@ -1,0 +1,18 @@
+tenant_id: "tenant1"
+topic_prefix: "t1_"
+stations: 
+  - pizza
+  - sushi  
+  - grill
+  - fryer
+menu:
+  pizza: ["Margherita", "Pepperoni", "BBQ Chicken"]
+  sushi: ["Spicy Tuna", "California Roll", "Nigiri Set"]
+  grill: ["Burger", "Steak", "Lamb Chops"]
+  fryer: ["Fries", "Wings", "Calamares"]
+slo_config:
+  window_size: 60
+  avg_prep_threshold: 10
+  p95_prep_threshold: 14
+  orders_per_min_threshold: 8
+

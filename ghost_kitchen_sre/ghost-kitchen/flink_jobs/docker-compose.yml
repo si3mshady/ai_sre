@@ -1,0 +1,117 @@
+import json
+import logging
+import time
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.connectors.kafka import FlinkKafkaConsumer, FlinkKafkaProducer
+from pyflink.common.serialization import SimpleStringSchema
+from pyflink.common.typeinfo import Types
+from pyflink.datastream.window import TumblingEventTimeWindows
+from pyflink.common.time import Time
+from pyflink.common.watermark_strategy import WatermarkStrategy
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def parse_order(event_json):
+    try:
+        return json.loads(event_json)
+    except Exception:
+        return None
+
+def extract_timestamp(event_json, record_timestamp):
+    o = parse_order(event_json)
+    if not o:
+        return 0
+    return int(o.get("timestamp", 0) * 1000)
+
+def compute_slo_metrics(orders):
+    if not orders:
+        return None
+
+    valid_orders = [o for o in orders if o]
+    if not valid_orders:
+        return None
+
+    prep_times = [o.get('prep_time_required', 0) for o in valid_orders]
+    prep_times = [p for p in prep_times if isinstance(p, (int, float))]
+
+    if not prep_times:
+        return None
+
+    avg_prep = sum(prep_times) / len(prep_times)
+    sorted_pts = sorted(prep_times)
+    idx = int(0.95 * (len(sorted_pts) - 1))
+    p95_prep = sorted_pts[idx]
+
+    station = valid_orders[0].get('station', 'unknown')
+    tenant = valid_orders[0].get('tenant_id', 'unknown')
+    window_start = valid_orders[0].get('timestamp', 0)
+
+    alert = {
+        'tenant_id': tenant,
+        'station': station,
+        'window_start': window_start,
+        'avg_prep_time': float(avg_prep),
+        'p95_prep_time': float(p95_prep),
+        'order_count': len(valid_orders),
+        'alert_type': 'SLO_VIOLATION' if avg_prep > 10 or p95_prep > 14 or len(valid_orders) > 8 else 'NORMAL',
+        'severity': 'CRITICAL' if avg_prep > 12 or p95_prep > 16 else 'WARNING',
+        'processed_at': time.time(),
+    }
+    return alert
+
+def main():
+    env = StreamExecutionEnvironment.get_execution_environment()
+    env.set_parallelism(1)
+
+    kafka_props = {
+        "bootstrap.servers": "redpanda:9092",
+        "group.id": "flink-slo-monitor",
+    }
+
+    consumer = FlinkKafkaConsumer(
+        topics=['t1_kitchen.orders'],
+        deserialization_schema=SimpleStringSchema(),
+        properties=kafka_props
+    )
+    consumer.set_start_from_latest()
+
+    stream = env.add_source(consumer)
+
+    # FIXED: Proper TimestampAssigner class (not plain function)
+    class EventTimeAssigner:
+        def extract_timestamp(self, value, record_timestamp):
+            return extract_timestamp(value, record_timestamp)
+
+    watermark_strategy = WatermarkStrategy.for_monotonous_timestamps() \
+        .with_timestamp_assigner(EventTimeAssigner())
+
+    keyed_stream = stream \
+        .assign_timestamps_and_watermarks(watermark_strategy) \
+        .key_by(lambda x: parse_order(x).get('station', 'unknown') if parse_order(x) else 'unknown')
+
+    def process_window(key, context):
+        orders = context.window().get_state_value('orders') or []
+        return orders
+
+    windowed_stream = keyed_stream \
+        .key_by(lambda x: parse_order(x).get('station', 'unknown') if parse_order(x) else 'unknown') \
+        .window(TumblingEventTimeWindows.of(Time.seconds(60))) \
+        .apply(lambda key, window, inputs, out: [
+            json.dumps(compute_slo_metrics(inputs)) 
+            for input_data in inputs 
+            if compute_slo_metrics(inputs)
+        ], output_type=Types.LIST(Types.STRING()))
+
+    producer = FlinkKafkaProducer(
+        topic='t1_kitchen.alerts',
+        serialization_schema=SimpleStringSchema(),
+        producer_config={"bootstrap.servers": "redpanda:9092"}
+    )
+
+    windowed_stream.add_sink(producer)
+    env.execute("Elite Ghost Kitchen SLO Monitor")
+
+if __name__ == "__main__":
+    main()
+
