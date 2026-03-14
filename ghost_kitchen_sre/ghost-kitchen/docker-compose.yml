@@ -38,8 +38,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.0"
-          memory: 1g
+          cpus: "3.0"
+          memory: 3g
 
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:latest
@@ -71,8 +71,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.0"
-          memory: 2g
+          cpus: "3.0"
+          memory: 3g
 
   kitchen-producer:
     build: 
@@ -127,6 +127,9 @@ services:
 
   kitchen-agent:
     container_name: kitchen-agent
+    command: ["sh", "-c", "sleep 20 && echo '✅ Starting after 20s delay' && python control_plane.py"]
+  
+
     build:
       context: .
       dockerfile: Dockerfile.agent
