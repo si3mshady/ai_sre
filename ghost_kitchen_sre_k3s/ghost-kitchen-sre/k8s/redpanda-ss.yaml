@@ -38,7 +38,7 @@ spec:
           - --kafka-addr
           - internal://0.0.0.0:9092
           - --advertise-kafka-addr
-          - redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092
+          - internal://redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092
         image: docker.redpanda.com/redpandadata/redpanda:v25.3.10
         volumeMounts:
         - name: datadir

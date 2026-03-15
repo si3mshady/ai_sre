@@ -1,212 +1,206 @@
 import json
 import os
 import time
+import logging
 from typing import TypedDict, Dict, Any
 
-import logging
-import yaml
 from kafka import KafkaConsumer, KafkaProducer
 from langgraph.graph import StateGraph, END
 from langchain_ollama import OllamaLLM
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Logging Configuration
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("SRE-Control-Plane")
 
-# Simple TypedDict - works on Python 3.10+3.11 (no NotRequired needed)
 class ControlState(TypedDict):
     alert: Dict[str, Any]
     slo_metrics: Dict[str, Any]
     policy_decision: str
     action_plan: str
     confidence: float
+    execution_status: str
 
-# Lazy singletons - prevent startup crashes
-_config: Dict[str, Any] | None = None
+# Lazy singletons
 _llm: OllamaLLM | None = None
+_k8s_apps_v1: client.AppsV1Api | None = None
 
-def get_config() -> Dict[str, Any]:
-    global _config
-    if _config is None:
-        max_retries = 5
-        for attempt in range(max_retries):
-            try:
-                cfg_path = os.getenv("KITCHEN_CONFIG_PATH", "/app/config/tenant1.yaml")
-                with open(cfg_path, 'r') as f:
-                    _config = yaml.safe_load(f)
-                logger.info(f"✅ Config loaded from {cfg_path}")
-                return _config
-            except FileNotFoundError:
-                logger.warning(f"Config not found at {cfg_path}, retry {attempt+1}/{max_retries}")
-            except PermissionError:
-                logger.error(f"Permission denied on {cfg_path}. Fix: chmod 644 config/*.yaml")
-                raise
-            except Exception as e:
-                logger.error(f"Config load error: {e}, retry {attempt+1}/{max_retries}")
-            time.sleep(2 ** attempt)
-        raise RuntimeError("Failed to load config after retries")
-    return _config
+def get_k8s_client() -> client.AppsV1Api:
+    """Initialize K8s client with in-cluster config."""
+    global _k8s_apps_v1
+    if _k8s_apps_v1 is None:
+        try:
+            config.load_incluster_config()
+            _k8s_apps_v1 = client.AppsV1Api()
+            logger.info("✅ Kubernetes In-Cluster client initialized")
+        except config.ConfigException:
+            logger.warning("Local Kubeconfig detected (not in-cluster)")
+            config.load_kube_config()
+            _k8s_apps_v1 = client.AppsV1Api()
+    return _k8s_apps_v1
 
 def get_llm() -> OllamaLLM:
+    """Initializes connection to Ollama using the llama3.1:8b model."""
     global _llm
     if _llm is None:
-        max_retries = 10
-        for attempt in range(max_retries):
-            try:
-                # Test Ollama connectivity first
-                import requests
-                resp = requests.get("http://ollama:11434/api/tags", timeout=10)
-                if resp.status_code != 200:
-                    raise RuntimeError(f"Ollama API error: {resp.status_code}")
-                
-                _llm = OllamaLLM(
-                    model="llama3.1:8b",
-                    base_url="http://ollama:11434",
-                    temperature=0.1,
-                    timeout=60
-                )
-                # Quick healthcheck
-                _llm.invoke("OK")
-                logger.info("✅ OllamaLLM ready")
-                return _llm
-            except Exception as e:
-                logger.warning(f"Ollama init failed (attempt {attempt+1}/{max_retries}): {e}")
-                time.sleep(5)
-        raise RuntimeError("OllamaLLM initialization failed after retries")
+        _llm = OllamaLLM(
+            model="llama3.1:8b",
+            base_url="http://ollama:11434",
+            temperature=0.1,
+            timeout=60
+        )
+        logger.info("✅ OllamaLLM initialized for llama3.1:8b")
     return _llm
 
+# --- LANGGRAPH NODES ---
+
 def policy_engine(state: ControlState) -> ControlState:
-    """SRE Policy Engine - maps SLO violations to actions"""
+    """Node 1: Reasoning - Uses Llama 3 to decide policy based on SLO metrics."""
     alert = state.get("alert", {})
-    metrics = state.get("slo_metrics", {}) or {
-        "avg_prep_time": alert.get("avg_prep_time", 0),
-        "p95_prep_time": alert.get("p95_prep_time", 0),
-        "order_count": alert.get("order_count", 0),
-    }
-
-    prompt = f"""SRE Policy Engine Analysis:
-Tenant: {alert.get('tenant_id', 'unknown')}
+    metrics = state.get("slo_metrics", {})
+    
+    prompt = f"""[SRE ANALYSIS]
 Station: {alert.get('station', 'unknown')}
-Alert: {alert.get('alert_type', 'UNKNOWN')} ({alert.get('severity', 'INFO')})
-Metrics: avg_prep={metrics.get('avg_prep_time', 0):.1f}, p95={metrics.get('p95_prep_time', 0):.1f}, orders/min={metrics.get('order_count', 0)}
+Metrics: Avg={metrics.get('avg_prep_time')}s, P95={metrics.get('p95_prep_time')}s, Load={metrics.get('order_count')}
+Current Alert: {alert.get('alert_type')}
 
-Choose ONE policy action ONLY (exactly one word): REBALANCE|THROTTLE|SCALE|INVESTIGATE"""
+Decide Policy: REBALANCE, THROTTLE, SCALE, or INVESTIGATE. 
+Return only the word."""
 
     try:
-        llm = get_llm()
-        decision = llm.invoke(prompt).strip().upper()
-        valid_policies = ['REBALANCE', 'THROTTLE', 'SCALE', 'INVESTIGATE']
-        policy = next((p for p in valid_policies if p in decision), 'INVESTIGATE')
-        confidence = 0.9 if policy != 'INVESTIGATE' else 0.7
+        decision = get_llm().invoke(prompt).strip().upper()
+        policy = next((p for p in ['REBALANCE', 'THROTTLE', 'SCALE', 'INVESTIGATE'] if p in decision), 'INVESTIGATE')
     except Exception as e:
-        logger.error(f"LLM policy error: {e}. Defaulting to INVESTIGATE.")
-        policy, confidence = 'INVESTIGATE', 0.5
+        logger.error(f"LLM Error: {e}")
+        policy = 'INVESTIGATE'
 
-    return {
-        "alert": alert,
-        "slo_metrics": metrics,
-        "policy_decision": policy,
-        "confidence": confidence,
-    }
+    state["policy_decision"] = policy
+    state["confidence"] = 0.9 if policy != "INVESTIGATE" else 0.7
+    return state
 
 def action_generator(state: ControlState) -> ControlState:
-    """Generate concrete remediation actions"""
+    """Node 2: Planning - Maps policy to specific remediation intent."""
     policy = state["policy_decision"]
-    alert = state["alert"]
-    station = alert.get("station", "unknown")
+    station = state["alert"].get("station", "unknown")
 
     actions = {
-        "REBALANCE": f"Redirect 30% {station} orders to grill station",
-        "THROTTLE": f"Pause {station} high-prep items (>12m)",
-        "SCALE": f"Request 2x capacity for {station}",
-        "INVESTIGATE": f"Escalate {station} SLO violation to SRE oncall"
+        "REBALANCE": f"Shift load from {station} to underutilized stations",
+        "THROTTLE": f"Limit incoming orders for {station}",
+        "SCALE": f"Increase replica count for {station} processing workers",
+        "INVESTIGATE": f"Check logs for {station} anomalous latency"
     }
+    state["action_plan"] = actions.get(policy, "No action required")
+    return state
 
-    return {
-        "alert": alert,
-        "slo_metrics": state["slo_metrics"],
-        "policy_decision": policy,
-        "action_plan": actions.get(policy, "MONITOR"),
-        "confidence": state["confidence"],
-    }
+def k8s_executor(state: ControlState) -> ControlState:
+    """Node 3: Execution - Interacts with the K3s API to scale resources."""
+    if state["policy_decision"] != "SCALE":
+        state["execution_status"] = "SKIPPED (Non-scaling policy)"
+        return state
 
-# Build graph once at module load
+    k8s = get_k8s_client()
+    # Target deployment for the ghost kitchen processing logic
+    target_deploy = "flink-taskmanager" 
+    namespace = "kitchen-sre"
+
+    try:
+        # 1. Fetch current scale
+        scale = k8s.read_namespaced_deployment_scale(name=target_deploy, namespace=namespace)
+        current_replicas = scale.spec.replicas
+        new_replicas = current_replicas + 1
+
+        # 2. Safety Cap
+        if new_replicas > 10:
+            state["execution_status"] = "ABORTED (Max replicas reached)"
+            return state
+
+        # 3. Apply Scaling Patch
+        scale.spec.replicas = new_replicas
+        k8s.patch_namespaced_deployment_scale(name=target_deploy, namespace=namespace, body=scale)
+        
+        state["execution_status"] = f"SUCCESS (Scaled {current_replicas} -> {new_replicas})"
+        logger.info(f"🚀 K8s Auto-Scale: {target_deploy} scaled to {new_replicas}")
+
+    except ApiException as e:
+        state["execution_status"] = f"FAILED (K8s API Error: {e.status})"
+        logger.error(f"K8s Scaling Failed: {e}")
+    
+    return state
+
+# --- GRAPH CONSTRUCTION ---
 workflow = StateGraph(ControlState)
 workflow.add_node("policy_engine", policy_engine)
 workflow.add_node("action_generator", action_generator)
+workflow.add_node("k8s_executor", k8s_executor)
+
 workflow.add_edge("policy_engine", "action_generator")
+workflow.add_edge("action_generator", "k8s_executor")
+workflow.add_edge("k8s_executor", END)
 workflow.set_entry_point("policy_engine")
-workflow.add_edge("action_generator", END)
 
-app = workflow.compile()
+agent_app = workflow.compile()
 
-def main():
-    """Production main loop with retries"""
-    get_config()  # Warm up config
-    
-    bootstrap_servers = os.getenv("BOOTSTRAP_SERVERS", "redpanda:9092")
-    
-    consumer = KafkaConsumer(
-        't1_kitchen.alerts',
-        bootstrap_servers=bootstrap_servers,
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-        consumer_timeout_ms=5000,
-        group_id='control-plane',
-        enable_auto_commit=True,
-        auto_offset_reset='latest'
-    )
+# --- RESILIENT KAFKA STARTUP ---
 
-    producer = KafkaProducer(
-        bootstrap_servers=bootstrap_servers,
-        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        retries=3
-    )
-
-    logger.info("🤖 Elite SRE Control Plane Online - waiting for alerts...")
-    
+def get_kafka_clients():
+    """Loops until Kafka/Redpanda is reachable to avoid CrashLoopBackOff."""
+    bootstrap = os.getenv("BOOTSTRAP_SERVERS", "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092")
     while True:
         try:
-            msg_batch = consumer.poll(timeout_ms=10000, max_records=10)
-            if not msg_batch:
-                logger.debug("No alerts available")
-                continue
-                
-            for topic_partition, messages in msg_batch.items():
-                for msg in messages:
-                    alert = msg.value
-                    logger.debug(f"Processing alert: {alert.get('station', 'unknown')}")
-                    
-                    try:
-                        result = app.invoke({
-                            "alert": alert,
-                            "slo_metrics": {
-                                "avg_prep_time": alert.get('avg_prep_time', 0),
-                                "p95_prep_time": alert.get('p95_prep_time', 0),
-                                "order_count": alert.get('order_count', 0)
-                            }
-                        })
-
-                        action = {
-                            **alert,
-                            "policy": result["policy_decision"],
-                            "action": result["action_plan"],
-                            "confidence": result["confidence"],
-                            "timestamp": time.time()
-                        }
-
-                        producer.send('t1_kitchen.actions', action)
-                        logger.info(f"✅ [{action['station']}] {action['policy']} -> {action['action'][:50]}...")
-                        
-                    except Exception as e:
-                        logger.error(f"Alert processing failed: {e}")
-            
-            consumer.commit()
-        except KeyboardInterrupt:
-            logger.info("🛑 Shutting down gracefully...")
-            break
+            logger.info(f"📡 Connecting to Kafka at {bootstrap}...")
+            consumer = KafkaConsumer(
+                't1_kitchen.alerts',
+                bootstrap_servers=bootstrap,
+                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+                group_id='sre-brain-group',
+                request_timeout_ms=5000
+            )
+            producer = KafkaProducer(
+                bootstrap_servers=bootstrap,
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                request_timeout_ms=5000
+            )
+            return consumer, producer
         except Exception as e:
-            logger.error(f"Main loop error: {e}")
+            logger.error(f"❌ Connection failed: {e}. Retrying in 5s...")
             time.sleep(5)
+
+# --- MAIN LOOP ---
+def main():
+    consumer, producer = get_kafka_clients()
+    logger.info("🤖 Autonomous SRE Agent Online (K3s + LangGraph)")
+
+    for msg in consumer:
+        alert = msg.value
+        logger.info(f"📩 Alert: {alert.get('station')} | Type: {alert.get('alert_type')}")
+        
+        try:
+            # Execute the LangGraph State Machine
+            final_state = agent_app.invoke({
+                "alert": alert,
+                "slo_metrics": {
+                    "avg_prep_time": alert.get('avg_prep_time', 0),
+                    "p95_prep_time": alert.get('p95_prep_time', 0),
+                    "order_count": alert.get('order_count', 0)
+                }
+            })
+
+            # Record result to Kafka for the Dashboard
+            action_event = {
+                **alert,
+                "policy": final_state["policy_decision"],
+                "action": final_state["action_plan"],
+                "execution": final_state.get("execution_status", "N/A"),
+                "confidence": final_state["confidence"],
+                "agent_id": "Llama3-SRE-Brain",
+                "timestamp": time.time()
+            }
+            producer.send('t1_kitchen.actions', action_event)
+            logger.info(f"🏁 Final Policy: {action_event['policy']} | Status: {action_event['execution']}")
+
+        except Exception as e:
+            logger.error(f"Critical workflow failure: {e}")
 
 if __name__ == "__main__":
     main()
-

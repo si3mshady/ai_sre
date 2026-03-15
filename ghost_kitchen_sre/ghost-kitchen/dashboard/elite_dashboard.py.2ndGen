@@ -1,7 +1,5 @@
-import json
-import os
+import json, os
 import time
-import logging
 from collections import deque
 from datetime import datetime
 
@@ -10,15 +8,8 @@ import plotly.express as px
 import streamlit as st
 from kafka import KafkaConsumer
 
-# --- LOGGING CONFIGURATION ---
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("Dashboard")
-
 # --- CONFIGURATION ---
-KAFKA_BROKER = os.getenv("BOOTSTRAP_SERVERS", "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092")
+KAFKA_BROKER =  os.getenv("BOOTSTRAP_SERVERS", "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092")
 TOPICS = {
     "orders": "t1_kitchen.orders",
     "alerts": "t1_kitchen.alerts",
@@ -29,66 +20,46 @@ st.set_page_config(layout="wide", page_title="Elite Ghost Kitchen SRE", page_ico
 st.title("🍳 Elite Ghost Kitchen Control Plane")
 
 # --- PERSISTENT STATE ---
+# This ensures data persists when st.rerun() is called
 if "data" not in st.session_state:
-    logger.info("Initializing session state deques...")
     st.session_state.data = {
         "orders": deque(maxlen=1000),
         "alerts": deque(maxlen=500),
         "actions": deque(maxlen=200)
     }
 
-@st.cache_resource(show_spinner=False) # Spinner often causes NoSessionContext on hang
+@st.cache_resource
 def get_consumers():
     """Initialize all Kafka consumers once."""
-    logger.info(f"Connecting to Kafka Broker: {KAFKA_BROKER}")
     consumers = {}
     for key, topic in TOPICS.items():
-        try:
-            logger.info(f"Registering consumer for topic: {topic}")
-            consumers[key] = KafkaConsumer(
-                topic,
-                bootstrap_servers=KAFKA_BROKER,
-                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-                consumer_timeout_ms=100,
-                auto_offset_reset='latest',
-                group_id="dashboard-v3-global",
-                request_timeout_ms=5000 # Stop it from hanging the UI forever
-            )
-            logger.info(f"✅ Consumer {key} connected.")
-        except Exception as e:
-            logger.error(f"❌ Failed to connect to {topic}: {e}")
-            st.error(f"Kafka Error ({key}): {e}")
+        consumers[key] = KafkaConsumer(
+            topic,
+            bootstrap_servers=KAFKA_BROKER,
+            value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+            consumer_timeout_ms=50, # Fast timeout for UI responsiveness
+            auto_offset_reset='latest',
+            group_id=f"dashboard-v2-global"
+        )
     return consumers
 
 def poll_all_consumers(consumers):
     """Background poll to update all deques at once."""
-    counts = {k: 0 for k in TOPICS.keys()}
     for key, consumer in consumers.items():
-        try:
-            # Poll specifically for messages
-            messages = consumer.poll(timeout_ms=50)
-            for tp, msgs in messages.items():
-                for msg in msgs:
-                    st.session_state.data[key].appendleft(msg.value)
-                    counts[key] += 1
-        except Exception as e:
-            logger.error(f"Poll error on {key}: {e}")
-            break
-    
-    if any(counts.values()):
-        logger.info(f"Processed: {counts}")
+        # Drain the buffer (max 100 messages per poll to avoid UI lag)
+        for _ in range(100):
+            try:
+                msg = next(consumer)
+                st.session_state.data[key].appendleft(msg.value)
+            except (StopIteration, Exception):
+                break
 
 # --- UI ELEMENTS ---
 refresh_interval = st.sidebar.slider("Auto-refresh interval (seconds)", 1, 10, 3)
 st.sidebar.info(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
 
-# Execution context
-try:
-    current_consumers = get_consumers()
-    poll_all_consumers(current_consumers)
-except Exception as e:
-    logger.critical(f"Main loop crash: {e}")
-    st.error(f"Critical Dashboard Error: {e}")
+consumers = get_consumers()
+poll_all_consumers(consumers)
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "🔥 Live Orders", 
@@ -128,18 +99,21 @@ with tab3:
 
 with tab4:
     if len(d_orders) > 2:
-        df_orders = pd.DataFrame(list(d_orders))
+        df_orders = pd.DataFrame(d_orders)
         if 'timestamp' in df_orders.columns:
+            # Convert timestamp and handle sorting
             df_orders['dt'] = pd.to_datetime(df_orders['timestamp'], unit='s')
             df_plot = df_orders.sort_values('dt').tail(100)
 
+            # High-level Metrics
             m1, m2 = st.columns(2)
             avg_prep = df_plot['prep_time_required'].mean()
             slo_violation = avg_prep > 10
 
-            m1.metric("Avg Prep Time (Window)", f"{avg_prep:.2f}s", delta="-HIGH" if slo_violation else "Normal", delta_color="inverse")
+            m1.metric("Avg Prep Time (Window)", f"{avg_prep:.2f}s", delta="-Higher than 10s!" if slo_violation else "Normal", delta_color="inverse")
             m2.metric("Total Events Tracked", len(d_orders))
 
+            # Visualization
             fig = px.line(
                 df_plot,
                 x='dt',
@@ -152,5 +126,4 @@ with tab4:
 
 # --- AUTO-REFRESH TRIGGER ---
 time.sleep(refresh_interval)
-logger.debug("Rerunning Streamlit UI...")
 st.rerun()

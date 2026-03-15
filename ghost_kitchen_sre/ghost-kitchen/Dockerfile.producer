@@ -1,4 +1,5 @@
 FROM python:3.11-slim
 RUN pip install kafka-python pyyaml prometheus-client
 WORKDIR /app
+ENV BOOTSTRAP_SERVERS="redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
 COPY producer/*.py ./

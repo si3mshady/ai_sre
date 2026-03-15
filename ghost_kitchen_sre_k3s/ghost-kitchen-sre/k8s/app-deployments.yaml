@@ -16,7 +16,8 @@ spec:
       serviceAccountName: sre-agent-sa
       containers:
       - name: agent
-        image: si3mshady/aiops:agent-v1
+        imagePullPolicy: Always
+        image: si3mshady/aiops:agent-v2
         env:
         - name: BOOTSTRAP_SERVERS
           value: "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
@@ -39,8 +40,9 @@ spec:
     spec:
       containers:
       - name: producer
+        imagePullPolicy: Always
         command: ["python",  "kitchen_producer.py"]
-        image: si3mshady/aiops:producer-v1
+        image: si3mshady/aiops:producer-v2
         env:
         - name: BOOTSTRAP_SERVERS
           value: "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
@@ -62,7 +64,8 @@ spec:
     spec:
       containers:
       - name: dashboard
-        image: si3mshady/aiops:dashboard-v1
+        image: si3mshady/aiops:dashboard-v3
+        imagePullPolicy: Always  
         ports:
         - containerPort: 8501
         env:

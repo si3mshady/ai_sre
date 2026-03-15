@@ -40,7 +40,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 producer = KafkaProducer(
-    bootstrap_servers=os.getenv('BOOTSTRAP_SERVERS', 'redpanda:9092'),
+    bootstrap_servers=os.getenv('BOOTSTRAP_SERVERS', 'redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092'),
     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
 )
 
