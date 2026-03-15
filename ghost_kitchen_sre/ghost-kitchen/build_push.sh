@@ -6,7 +6,7 @@ set -euo pipefail
 # ============================================================
 DOCKER_USER="si3mshady"
 DOCKER_REPO="aiops"
-VERSION="v3"
+VERSION="v4"
 
 echo "🏗️  Starting Build & Push Phase for $DOCKER_USER/$DOCKER_REPO:$VERSION"
 

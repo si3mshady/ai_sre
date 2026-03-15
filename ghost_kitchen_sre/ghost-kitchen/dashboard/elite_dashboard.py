@@ -52,7 +52,8 @@ def get_consumers():
                 consumer_timeout_ms=100,
                 auto_offset_reset='latest',
                 group_id="dashboard-v3-global",
-                request_timeout_ms=5000 # Stop it from hanging the UI forever
+                session_timeout_ms=10000,
+                request_timeout_ms=15000 # Stop it from hanging the UI forever
             )
             logger.info(f"✅ Consumer {key} connected.")
         except Exception as e:

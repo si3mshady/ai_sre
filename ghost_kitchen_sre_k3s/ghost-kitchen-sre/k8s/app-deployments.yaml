@@ -64,7 +64,15 @@ spec:
     spec:
       containers:
       - name: dashboard
-        image: si3mshady/aiops:dashboard-v3
+        image: si3mshady/aiops:dashboard-v4
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Starting Dashboard..."
+            until streamlit run elite_dashboard.py --server.port 8501 --server.address 0.0.0.0; do
+            echo "Dashboard crashed. Retrying in 5 seconds..."
+            sleep 5
+            done  
         imagePullPolicy: Always  
         ports:
         - containerPort: 8501
