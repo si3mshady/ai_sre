@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  namespace: kitchen-sre
+spec:
+  clusterIP: None
+  ports:
+  - port: 9092
+    name: kafka
+  selector:
+    app: redpanda
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  namespace: kitchen-sre
+spec:
+  serviceName: "redpanda"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      containers:
+      - name: redpanda
+        command:
+          - /usr/bin/rpk
+          - redpanda
+          - start
+          - --mode
+          - dev-container
+          - --kafka-addr
+          - internal://0.0.0.0:9092
+          - --advertise-kafka-addr
+          - redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092
+        image: docker.redpanda.com/redpandadata/redpanda:v25.3.10
+        volumeMounts:
+        - name: datadir
+          mountPath: /var/lib/redpanda/data
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 5Gi
