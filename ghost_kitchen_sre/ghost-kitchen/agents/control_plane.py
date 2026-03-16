@@ -154,12 +154,13 @@ def get_kafka_clients():
                 bootstrap_servers=bootstrap,
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),
                 group_id='sre-brain-group',
-                request_timeout_ms=5000
+                session_timeout_ms=10000,
+                request_timeout_ms=15000
             )
             producer = KafkaProducer(
                 bootstrap_servers=bootstrap,
                 value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-                request_timeout_ms=5000
+                request_timeout_ms=15000
             )
             return consumer, producer
         except Exception as e:
