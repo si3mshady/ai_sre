@@ -17,7 +17,7 @@ spec:
       containers:
       - name: agent
         imagePullPolicy: Always
-        image: si3mshady/aiops:agent-v2
+        image: si3mshady/aiops:agent-v5
         env:
         - name: BOOTSTRAP_SERVERS
           value: "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
@@ -42,7 +42,7 @@ spec:
       - name: producer
         imagePullPolicy: Always
         command: ["python",  "kitchen_producer.py"]
-        image: si3mshady/aiops:producer-v2
+        image: si3mshady/aiops:producer-v5
         env:
         - name: BOOTSTRAP_SERVERS
           value: "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
@@ -64,7 +64,7 @@ spec:
     spec:
       containers:
       - name: dashboard
-        image: si3mshady/aiops:dashboard-v4
+        image: si3mshady/aiops:dashboard-v5
         command: ["/bin/sh", "-c"]
         args:
           - |

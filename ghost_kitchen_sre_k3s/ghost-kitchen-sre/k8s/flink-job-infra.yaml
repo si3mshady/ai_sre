@@ -36,7 +36,8 @@ spec:
     spec:
       containers:
       - name: jobmanager
-        image: si3mshady/aiops:flink-v4    # The one built from Dockerfile.flink
+        imagePullPolicy: Always
+        image: si3mshady/aiops:flink-v5    # The one built from Dockerfile.flink
         args: ["jobmanager"]
         ports:
         - containerPort: 6123
@@ -64,7 +65,8 @@ spec:
     spec:
       containers:
       - name: taskmanager
-        image: si3mshady/aiops:flink-v4   # Same image
+        imagePullPolicy: Always
+        image: si3mshady/aiops:flink-v5   # Same image
         args: ["taskmanager"]
         env:
         - name: JOB_MANAGER_RPC_ADDRESS

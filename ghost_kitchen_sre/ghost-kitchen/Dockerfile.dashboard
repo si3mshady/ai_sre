@@ -1,5 +1,5 @@
 FROM python:3.11-slim
-RUN pip install streamlit pandas kafka-python plotly
+RUN pip  install kubernetes  streamlit pandas kafka-python plotly
 ENV BOOTSTRAP_SERVERS="redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
 WORKDIR /app
 COPY dashboard/*.py ./
