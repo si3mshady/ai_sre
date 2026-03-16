@@ -5,23 +5,27 @@ metadata:
   namespace: kitchen-sre
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: sre-agent-role
+  namespace: kitchen-sre
 rules:
 - apiGroups: ["apps", ""]
-  resources: ["deployments", "deployments/scale", "pods", "services"]
-  verbs: ["get", "list", "watch", "patch", "update"]
+  # Added 'events' so your context_fetcher can see cluster issues
+  resources: ["deployments", "deployments/scale", "pods", "services", "events"]
+  # Added 'delete' so your KILL_POD policy actually works
+  verbs: ["get", "list", "watch", "patch", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: sre-agent-binding
+  namespace: kitchen-sre
 subjects:
 - kind: ServiceAccount
   name: sre-agent-sa
   namespace: kitchen-sre
 roleRef:
-  kind: ClusterRole
+  kind: Role
   name: sre-agent-role
   apiGroup: rbac.authorization.k8s.io

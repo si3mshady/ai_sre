@@ -27,7 +27,7 @@ spec:
       initContainers:
       - name: pull-model
         image: ollama/ollama:latest
-        command: ["/bin/sh", "-c", "ollama serve & sleep 10 && ollama pull llama3.1:8b"]
+        command: ["/bin/sh", "-c", "ollama serve & sleep 10 && ollama pull llama3"]
       containers:
       - name: ollama
         image: ollama/ollama:latest
