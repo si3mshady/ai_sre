@@ -62,6 +62,7 @@ spec:
       labels:
         app: dashboard
     spec:
+      serviceAccountName: elite-dashboard-sa
       containers:
       - name: dashboard
         image: si3mshady/aiops:dashboard-v5
