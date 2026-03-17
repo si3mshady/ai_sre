@@ -8,6 +8,9 @@ from kubernetes import client, config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("SRE-Control-Plane")
 
+HOST  = os.getenv("OLLAMA_HOST", "http://ollama.kitchen-sre.svc.cluster.local:11434" )
+
+
 class ControlState(TypedDict):
     alert: Dict[str, Any]
     slo_metrics: Dict[str, Any]
@@ -24,7 +27,7 @@ def get_k8s():
 def get_llm():
     return OllamaLLM(
             model="llama3:latest", 
-        base_url="http://ollama:11434", 
+        base_url=HOST, 
         temperature=0.1,
         timeout=300
     )

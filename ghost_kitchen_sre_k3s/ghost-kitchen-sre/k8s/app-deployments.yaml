@@ -19,9 +19,10 @@ spec:
         imagePullPolicy: Always
         image: si3mshady/aiops:agent-v5
         env:
+        - name: OLLAMA_HOST # <--- Add this
+          value: "http://ollama.kitchen-sre.svc.cluster.local:11434"
         - name: BOOTSTRAP_SERVERS
           value: "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
-        # No KITCHEN_CONFIG_PATH or volumeMounts needed if logic is internal
 ---
 apiVersion: apps/v1
 kind: Deployment

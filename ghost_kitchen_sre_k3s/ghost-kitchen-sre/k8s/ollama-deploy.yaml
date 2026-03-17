@@ -26,6 +26,9 @@ spec:
     spec:
       initContainers:
       - name: pull-model
+        volumeMounts: # <--- THIS WAS MISSING
+        - name: ollama-storage
+          mountPath: /root/.ollama
         image: ollama/ollama:latest
         command: ["/bin/sh", "-c", "ollama serve & sleep 10 && ollama pull llama3"]
       containers:
