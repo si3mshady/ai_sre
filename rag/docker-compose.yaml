@@ -1,0 +1,45 @@
+services:
+  # LLM Engine
+  ollama:
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q 'llama3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    
+
+    entrypoint: /bin/sh
+    command: -c "ollama serve & sleep 5 && ollama pull llama3 && wait"    
+    image: ollama/ollama
+    container_name: ghost_kitchen_ollama
+    volumes:
+      - ./ollama_storage:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  # Vector Database [cite: 20, 353]
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: ghost_kitchen_chroma
+    ports:
+      - "8000:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+    volumes:
+      - ./chroma_data:/chroma/chroma
+
+  # FastAPI RAG Service
+  rag-service:
+    build: .
+    container_name: ghost_kitchen_api
+    ports:
+      - "8080:8080"
+    environment:
+      - CHROMA_HOST=chroma
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./data:/app/data  # Dynamic mount for runbook updates
+    depends_on:
+      - chroma
+      - ollama
