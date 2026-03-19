@@ -24,22 +24,31 @@ class ControlState(TypedDict):
 
 def call_rag_tool(state: ControlState):
     """Consults the RAG Token Factory for runbook interpretation."""
-    metric = state["alert"].get("metric_name", "prep_time")
+    # FIX: Use the specific metric key that Flink provides and the Runbook expects
+    # We default to 'p95_prep' as that is our primary Flink alert anchor
+    metric = "p95_prep" 
     value = state["alert"].get("p95_prep", 0.0)
     
+    logger.info(f"🔍 Consulting RAG for {metric} with value {value}")
+    
     try:
-        r = requests.get(RAG_ENDPOINT, params={"metric": metric, "value": value}, timeout=10)
+        r = requests.get(RAG_ENDPOINT, params={"metric": metric, "value": value}, timeout=180)
         data = r.json()
+        
+        # FIX: Aligning keys with your FastAPI response structure
         return {
-            "rag_insight": data["reasoning"],
-            "rag_metrics": data["metrics"]
+            "rag_insight": data.get("runbook_instruction", "No runbook instruction returned."),
+            "rag_metrics": data.get("factory_metrics", {})
         }
     except Exception as e:
         logger.error(f"RAG Tool Failure: {e}")
-        return {"rag_insight": "Manual override: RAG unavailable.", "rag_metrics": {}}
+        return {
+            "rag_insight": "Critical: RAG Service Timeout. Defaulting to safe state.", 
+            "rag_metrics": {"error": str(e)}
+        }
+
 
 def analyze_policy(state: ControlState):
-    """LangGraph node to decide K8s action based on RAG context."""
     llm = OllamaLLM(model="llama3:latest", base_url=HOST, temperature=0)
     
     prompt = f"""
@@ -51,14 +60,27 @@ def analyze_policy(state: ControlState):
     
     try:
         response = llm.invoke(prompt)
-        parsed = json.loads(response)
+        # Robust JSON extraction: Find the first '{' and last '}'
+        start = response.find('{')
+        end = response.rfind('}') + 1
+        if start == -1 or end == 0:
+            raise ValueError("No JSON found in LLM response")
+            
+        json_str = response[start:end]
+        parsed = json.loads(json_str)
+        
         return {
             "policy_decision": parsed.get("decision", "IGNORE"),
             "action_plan": f"RAG Advised: {state['rag_insight']} | Agent Plan: {parsed.get('plan')}",
-            "suggested_value": parsed.get("replicas", 2)
+            "suggested_value": int(parsed.get("replicas", 2))
         }
-    except:
+    except Exception as e:
+        logger.error(f"Policy Engine Parsing Error: {e} | Raw Response: {response}")
         return {"policy_decision": "IGNORE", "action_plan": "Fallback: Parse Error", "suggested_value": 1}
+
+
+
+
 
 # --- GRAPH CONSTRUCTION ---
 workflow = StateGraph(ControlState)
@@ -77,37 +99,49 @@ def run_agent():
             't1_kitchen.alerts',
             bootstrap_servers=BOOTSTRAP,
             value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-            auto_offset_reset='latest'
+            auto_offset_reset='latest',
+            group_id='sre-control-plane-v1',
+            max_poll_interval_ms=300000, # Allow 5 mins of "thinking" time
+            session_timeout_ms=30000,    # 30s heartbeat timeout
+            heartbeat_interval_ms=10000  # Send heartbeat every 10s
         )
         producer = KafkaProducer(
             bootstrap_servers=BOOTSTRAP,
             value_serializer=lambda v: json.dumps(v).encode('utf-8')
         )
     except Exception as e:
-        logger.error(f"Connection Error: {e}")
+        logger.error(f"Kafka Connection Error: {e}")
         return
 
-    logger.info("🤖 RAG-Augmented Agent Online")
+    logger.info("🤖 RAG-Augmented Agent Online and Listening for SLO Breaches...")
 
     for msg in consumer:
         alert = msg.value
-        res = agent_app.invoke({"alert": alert})
+        logger.info(f"🚨 Alert Received for {alert.get('station', 'unknown')}")
         
-        # Package proposal with RAG reasoning for the Dashboard
-        proposal = {
-            "id": f"rag-act-{int(time.time())}",
-            "type": res["policy_decision"],
-            "target": alert.get('station', 'unknown'),
-            "value": res["suggested_value"],
-            "reason": res["action_plan"], # This now contains the RAG chain
-            "rag_metrics": res.get("rag_metrics", {}),
-            "status": "AWAITING_AUTH"
-        }
-        
-        if proposal["type"] != "IGNORE":
-            producer.send('t1_kitchen.actions', proposal)
-            producer.flush()
-            logger.info(f"📤 RAG-Backed Proposal sent for {proposal['target']}")
+        try:
+            res = agent_app.invoke({"alert": alert})
+            
+            # Package proposal for the Dashboard
+            proposal = {
+                "id": f"rag-act-{int(time.time())}",
+                "type": res["policy_decision"],
+                "target": alert.get('station', 'unknown'),
+                "value": res["suggested_value"],
+                "reason": res["action_plan"],
+                "rag_metrics": res.get("rag_metrics", {}),
+                "status": "AWAITING_AUTH"
+            }
+            
+            if proposal["type"] != "IGNORE":
+                producer.send('t1_kitchen.actions', proposal)
+                producer.flush()
+                logger.info(f"📤 Action Proposal sent to Dashboard for {proposal['target']}")
+            else:
+                logger.info("ℹ️ Agent decided to IGNORE this alert based on policy.")
+                
+        except Exception as e:
+            logger.error(f"Workflow Execution Error: {e}")
 
 if __name__ == "__main__":
     run_agent()

@@ -3,19 +3,16 @@ from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import FlinkKafkaConsumer, FlinkKafkaProducer
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.typeinfo import Types
-from pyflink.datastream.window import TumblingEventTimeWindows
+from pyflink.datastream.window import SlidingEventTimeWindows # Changed to Sliding
 from pyflink.common.time import Time, Duration
 from pyflink.common.watermark_strategy import WatermarkStrategy
 from pyflink.datastream.functions import ProcessWindowFunction
 
-# 1. Class-based window processing to fix the 'open' attribute error
 class KitchenWindowProcess(ProcessWindowFunction):
-    def clear(self, context):
-        pass
-
     def process(self, key, context, elements):
-        orders = [e for e in elements]
+        orders = [json.loads(e) if isinstance(e, str) else e for e in elements]
         metrics = compute_slo_metrics(orders)
+        # CRITICAL: Only yield if it's actually a VIOLATION to avoid 0.0 noise
         if metrics and metrics.get('alert_type') == 'SLO_VIOLATION':
             yield json.dumps(metrics)
 
@@ -28,47 +25,45 @@ def compute_slo_metrics(orders):
     p95_prep = sorted(prep_times)[int(0.95 * (len(prep_times) - 1))]
     order_count = len(orders)
 
-    suggested = max(1, math.ceil(order_count / 3))
-    is_violation = avg_prep > 10 or p95_prep > 14 or order_count > 8
+    # RE-ALIGNED THRESHOLDS: Match your slo_runbook.md (p95 > 8.0)
+    # We lowered these so the 40s spikes trigger the RAG immediately
+    is_violation = p95_prep > 8.0 or order_count > 15
 
     return {
-        'tenant_id': orders[0].get('tenant_id'),
         'station': orders[0].get('station', 'unknown'),
-        'avg_prep_time': round(avg_prep, 2),
-        'p95_prep_time': round(p95_prep, 2),
+        'p95_prep': round(p95_prep, 2), # Key name matches Agent/Runbook
+        'avg_prep': round(avg_prep, 2),
         'order_count': order_count,
-        'suggested_replicas': suggested,
         'alert_type': 'SLO_VIOLATION' if is_violation else 'NORMAL',
-        'action_required': 'SCALE' if is_violation else 'NONE',
         'processed_at': time.time(),
     }
 
 def main():
     env = StreamExecutionEnvironment.get_execution_environment()
-    env.set_parallelism(1) # Recommended for local k3s testing
+    env.set_parallelism(1)
     
     brokers = "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
     
     consumer = FlinkKafkaConsumer(
         ['t1_kitchen.orders'], 
         SimpleStringSchema(), 
-        {"bootstrap.servers": brokers, "group.id": "flink-scaler"}
+        {"bootstrap.servers": brokers, "group.id": "flink-demo-aggregator"}
     )
     
     ds = env.add_source(consumer.set_start_from_latest())
 
-    # 2. Fix the Watermark/Timer error by adding Idleness
+    # Tightened Watermark for faster processing
     watermark_strategy = WatermarkStrategy \
-        .for_bounded_out_of_orderness(Duration.of_seconds(20)) \
+        .for_bounded_out_of_orderness(Duration.of_seconds(5)) \
         .with_timestamp_assigner(lambda x, _: int(json.loads(x).get('timestamp', 0) * 1000)) \
-        .with_idleness(Duration.of_minutes(1)) 
+        .with_idleness(Duration.of_seconds(10)) 
 
     alert_stream = (
         ds.assign_timestamps_and_watermarks(watermark_strategy)
-        .map(lambda x: json.loads(x), output_type=Types.PICKLED_BYTE_ARRAY())
+        .map(lambda x: json.loads(x))
         .key_by(lambda x: x.get('station', 'unknown'))
-        .window(TumblingEventTimeWindows.of(Time.seconds(60)))
-        # 3. Use the ProcessWindowFunction class here
+        # 10s Window that slides every 5s. Much more aggressive.
+        .window(SlidingEventTimeWindows.of(Time.seconds(10), Time.seconds(5)))
         .process(KitchenWindowProcess(), output_type=Types.STRING())
     )
 
@@ -78,7 +73,7 @@ def main():
         {"bootstrap.servers": brokers}
     ))
     
-    env.execute("Elite Ghost Kitchen Scaler")
+    env.execute("Elite Ghost Kitchen Demo Scaler")
 
 if __name__ == "__main__":
     main()
