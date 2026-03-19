@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    fastapi uvicorn chromadb requests \
+    llama-index \
+    llama-index-vector-stores-chroma \
+    llama-index-embeddings-huggingface \
+    llama-index-llms-ollama
+
+RUN mkdir -p /app/data
+
+COPY rag/main.py main.py
+COPY rag/data/slo_runbook.md  /app/data/slo_runbook.md
+
+
+EXPOSE 8080
+
+CMD ["python", "main.py"]

@@ -1,159 +1,113 @@
-import json, os, time, logging
+import json, os, time, logging, requests
 from typing import TypedDict, Dict, Any, List
 from kafka import KafkaConsumer, KafkaProducer
 from langgraph.graph import StateGraph, END
 from langchain_ollama import OllamaLLM
 from kubernetes import client, config
 
-# Logging Configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("SRE-Control-Plane")
 
-# Environment Variables
+# --- ENVIRONMENT ---
 HOST = os.getenv("OLLAMA_HOST", "http://ollama.kitchen-sre.svc.cluster.local:11434")
 BOOTSTRAP = os.getenv("BOOTSTRAP_SERVERS", "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092")
-
-# Whitelist of deployments the agent is authorized to manage
+RAG_ENDPOINT = os.getenv("RAG_SERVICE_URL", "http://rag-service.kitchen-sre.svc.cluster.local:8080/diagnose")
 ALLOWED_TARGETS = ["kitchen-agent", "kitchen-producer", "kitchen-dashboard"]
 
 class ControlState(TypedDict):
     alert: Dict[str, Any]
-    slo_metrics: Dict[str, Any]
-    k8s_events: List[str]
+    rag_insight: str
+    rag_metrics: Dict[str, Any]
     policy_decision: str
     action_plan: str
     suggested_value: int
 
-def get_k8s():
+def call_rag_tool(state: ControlState):
+    """Consults the RAG Token Factory for runbook interpretation."""
+    metric = state["alert"].get("metric_name", "prep_time")
+    value = state["alert"].get("p95_prep", 0.0)
+    
     try:
-        config.load_incluster_config()
+        r = requests.get(RAG_ENDPOINT, params={"metric": metric, "value": value}, timeout=10)
+        data = r.json()
+        return {
+            "rag_insight": data["reasoning"],
+            "rag_metrics": data["metrics"]
+        }
+    except Exception as e:
+        logger.error(f"RAG Tool Failure: {e}")
+        return {"rag_insight": "Manual override: RAG unavailable.", "rag_metrics": {}}
+
+def analyze_policy(state: ControlState):
+    """LangGraph node to decide K8s action based on RAG context."""
+    llm = OllamaLLM(model="llama3:latest", base_url=HOST, temperature=0)
+    
+    prompt = f"""
+    Context: {state['rag_insight']}
+    Alert: {state['alert']}
+    Task: Decide if we should 'SCALE', 'RESTART', or 'IGNORE'.
+    Response Format: JSON only: {{"decision": "...", "plan": "...", "replicas": 0}}
+    """
+    
+    try:
+        response = llm.invoke(prompt)
+        parsed = json.loads(response)
+        return {
+            "policy_decision": parsed.get("decision", "IGNORE"),
+            "action_plan": f"RAG Advised: {state['rag_insight']} | Agent Plan: {parsed.get('plan')}",
+            "suggested_value": parsed.get("replicas", 2)
+        }
     except:
-        config.load_kube_config()
-    return client.CoreV1Api()
-
-def get_llm():
-    return OllamaLLM(
-        model="llama3:latest", 
-        base_url=HOST, 
-        temperature=0.1,
-        timeout=300
-    )
-
-# --- NODES ---
-
-def context_fetcher(state: ControlState) -> ControlState:
-    """Gathers cluster events to give Llama3 context on potential underlying issues."""
-    core = get_k8s()
-    try:
-        events = core.list_namespaced_event("kitchen-sre", limit=5)
-        state["k8s_events"] = [f"{e.reason}: {e.message}" for e in events.items]
-    except Exception as e:
-        logger.warning(f"Could not fetch K8s events: {e}")
-        state["k8s_events"] = ["No K8s events found."]
-    return state
-
-def policy_engine(state: ControlState) -> ControlState:
-    """Consults Llama3 to validate if the Flink-suggested scaling is appropriate."""
-    target = state['alert'].get('station', 'unknown')
-    
-    # Pre-check: If not in whitelist, skip LLM call to save resources
-    if target not in ALLOWED_TARGETS:
-        state["policy_decision"] = "IGNORE"
-        return state
-
-    prompt = f"""[SRE Agent] 
-    Station: {target}
-    Metrics: {state['slo_metrics']} 
-    Cluster Context: {state['k8s_events']}
-    Flink Suggestion: Scale to {state['alert'].get('suggested_replicas', 'N/A')}
-    
-    Decide: SCALE or KILL_POD. 
-    If metrics show high latency but events show no errors, choose SCALE.
-    Return ONLY the word."""
-    
-    try:
-        logger.info(f"🧠 Agent analyzing target: {target}...")
-        decision = get_llm().invoke(prompt).strip().upper()
-        # Fallback logic to ensure we get a valid keyword
-        state["policy_decision"] = next((p for p in ["SCALE", "KILL_POD"] if p in decision), "SCALE")
-    except Exception as e:
-        logger.error(f"LLM Error: {e}")
-        state["policy_decision"] = "SCALE" # Fail-safe to Scaling
-    return state
-
-def action_proposer(state: ControlState) -> ControlState:
-    """Formats the final proposal for the Dashboard actions topic."""
-    policy = state["policy_decision"]
-    target = state['alert'].get('station', 'unknown')
-    
-    if policy == "IGNORE":
-        state["action_plan"] = f"Skipping: {target} is not in the managed scaling whitelist."
-    elif policy == "SCALE":
-        state["action_plan"] = f"Proposing scale-out of {target} to {state['alert'].get('suggested_replicas', 2)} replicas."
-    elif policy == "KILL_POD":
-        state["action_plan"] = f"Proposing pod termination for {target} due to suspected process hang."
-    
-    logger.info(f"📝 Decision for {target}: {policy}")
-    return state
+        return {"policy_decision": "IGNORE", "action_plan": "Fallback: Parse Error", "suggested_value": 1}
 
 # --- GRAPH CONSTRUCTION ---
-
 workflow = StateGraph(ControlState)
-workflow.add_node("context", context_fetcher)
-workflow.add_node("policy", policy_engine)
-workflow.add_node("propose", action_proposer)
+workflow.add_node("consult_rag", call_rag_tool)
+workflow.add_node("decide_policy", analyze_policy)
 
-workflow.add_edge("context", "policy")
-workflow.add_edge("policy", "propose")
-workflow.add_edge("propose", END)
-workflow.set_entry_point("context")
+workflow.set_entry_point("consult_rag")
+workflow.add_edge("consult_rag", "decide_policy")
+workflow.add_edge("decide_policy", END)
+
 agent_app = workflow.compile()
 
-# --- MAIN EXECUTION ---
-
-def main():
+def run_agent():
     try:
         consumer = KafkaConsumer(
-            't1_kitchen.alerts', 
-            bootstrap_servers=BOOTSTRAP, 
-            group_id="sre-agent-group",
+            't1_kitchen.alerts',
+            bootstrap_servers=BOOTSTRAP,
             value_deserializer=lambda x: json.loads(x.decode('utf-8')),
             auto_offset_reset='latest'
         )
         producer = KafkaProducer(
-            bootstrap_servers=BOOTSTRAP, 
+            bootstrap_servers=BOOTSTRAP,
             value_serializer=lambda v: json.dumps(v).encode('utf-8')
         )
     except Exception as e:
-        logger.error(f"Kafka Connection Error: {e}")
+        logger.error(f"Connection Error: {e}")
         return
 
-    logger.info("🤖 SRE Agent (Llama3) Online - Proposer Mode Active")
-    logger.info(f"Targeting Deployments: {ALLOWED_TARGETS}")
+    logger.info("🤖 RAG-Augmented Agent Online")
 
     for msg in consumer:
         alert = msg.value
-        station = alert.get('station', 'unknown')
+        res = agent_app.invoke({"alert": alert})
         
-        # Invoke LangGraph workflow
-        res = agent_app.invoke({"alert": alert, "slo_metrics": alert})
+        # Package proposal with RAG reasoning for the Dashboard
+        proposal = {
+            "id": f"rag-act-{int(time.time())}",
+            "type": res["policy_decision"],
+            "target": alert.get('station', 'unknown'),
+            "value": res["suggested_value"],
+            "reason": res["action_plan"], # This now contains the RAG chain
+            "rag_metrics": res.get("rag_metrics", {}),
+            "status": "AWAITING_AUTH"
+        }
         
-        # Only publish to the dashboard if the target is managed
-        if res["policy_decision"] != "IGNORE":
-            proposal = {
-                "id": f"agent-act-{int(time.time())}",
-                "type": res["policy_decision"],
-                "target": station, # EXACT deployment name for K8s API
-                "value": alert.get('suggested_replicas', 2),
-                "reason": res["action_plan"],
-                "status": "AWAITING_AUTH",
-                "agent_id": "llama3-brain-v1"
-            }
+        if proposal["type"] != "IGNORE":
             producer.send('t1_kitchen.actions', proposal)
             producer.flush()
-            logger.info(f"📤 Proposal sent to Dashboard for {station}")
-        else:
-            logger.info(f"⏭️  Ignoring alert for unmanaged station: {station}")
+            logger.info(f"📤 RAG-Backed Proposal sent for {proposal['target']}")
 
-if __name__ == "__main__": 
-    main()
+if __name__ == "__main__":
+    run_agent()

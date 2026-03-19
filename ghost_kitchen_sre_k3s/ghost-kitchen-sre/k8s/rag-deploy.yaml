@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-service
+  namespace: kitchen-sre
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: rag-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  namespace: kitchen-sre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-service
+  template:
+    metadata:
+      labels:
+        app: rag-service
+    spec:
+      containers:
+      - name: rag-api
+        image: si3mshady/aiops:rag-v5
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: OLLAMA_HOST
+          value: "http://ollama.kitchen-sre.svc.cluster.local:11434"
+        - name: CHROMA_HOST
+          value: "chroma"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chroma
+  namespace: kitchen-sre
+spec:
+  ports:
+  - port: 8000
+  selector:
+    app: chroma
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chroma
+  namespace: kitchen-sre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chroma
+  template:
+    metadata:
+      labels:
+        app: chroma
+    spec:
+      enableServiceLinks: false  # CRITICAL: Fixes the 'CHROMA_PORT' panic
+      containers:
+      - name: chroma
+        image: chromadb/chroma:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: IS_PERSISTENT
+          value: "TRUE"
+        - name: ANONYMIZED_TELEMETRY
+          value: "FALSE"
