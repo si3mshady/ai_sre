@@ -1,31 +1,29 @@
-# Ghost Kitchen Service Level Objectives (SLO) & Runbook
+GHOST KITCHEN RUNBOOK VERSION TWO
 
-## Core Latency Metrics & Thresholds
-This section defines the technical keys used by Apache Flink and the corresponding SLO targets.
+METRIC NAME p95_prep
+SLO TARGET 5 SECONDS
+BREACH THRESHOLD 8 SECONDS
+SEVERITY CRITICAL
+AUTOMATED ACTION ENABLE API GATEWAY THROTTLING AND FORCE 5 SECOND QUEUE
+KUBERNETES COMMAND KUBECTL SCALE DEPLOYMENT KITCHEN STATION REPLICAS 5
+NOTIFICATION NOTIFY KITCHEN OPS MANAGER
 
-### METRIC: p90_prep (Order Creation)
-- **Target**: < 2 seconds
-- **Breach Threshold**: > 2 seconds
-- **Automated Action**: Enable "Lite Mode" on the frontend to remove high-resolution images and reduce payload size.
-- **Notification**: Alert the On-call Engineer via Slack.
+METRIC NAME p90_prep
+SLO TARGET 2 SECONDS
+BREACH THRESHOLD 2 SECONDS
+SEVERITY LOW
+AUTOMATED ACTION ENABLE LITE MODE ON FRONTEND
+KUBERNETES COMMAND KUBECTL PATCH DEPLOYMENT FRONTEND LITE MODE TRUE
+NOTIFICATION SLACK SRE ALERTS
 
-### METRIC: p95_prep (Kitchen Ticket Generation)
-- **Target**: < 5 seconds
-- **Breach Threshold**: > 8 seconds
-- **Critical Action**: Temporarily pause "Instant Checkout" and force a 5-second queue for all new incoming orders.
-- **Escalation**: Notify the Kitchen Operations Manager.
+METRIC NAME p99_prep
+SLO TARGET 10 SECONDS
+BREACH THRESHOLD 15 SECONDS
+SEVERITY EMERGENCY
+AUTOMATED ACTION SET GHOST KITCHEN STATUS TO BUSY ON DELIVERY APPS
+NOTIFICATION SMS EXECUTIVE ON CALL
 
-### METRIC: p99_prep (Delivery Dispatch)
-- **Target**: < 10 seconds
-- **Breach Threshold**: > 15 seconds
-- **Emergency Action**: Set Ghost Kitchen status to "Busy" on external delivery apps to throttle incoming traffic.
-
-## Diagnostic Procedures
-If the RAG service detects persistent latencies across any of the metrics above, verify the following:
-1. Check for "Chaos Mode" spikes in the `kitchen-producer`.
-2. Ensure `redpanda` brokers are not experiencing disk pressure.
-
-## Manual Mitigation
-If automated actions fail to stabilize latency within 3 minutes:
-- **Restart Command**: `kubectl rollout restart deployment order-processor -n kitchen-sre`
-- **Scale Command**: Increase replicas for the impacted station (fryer, sushi, grill).
+DIAGNOSTICS PROTOCOL
+IF LATENCY PERSISTS CHECK REDPANDA LAG ON ORDERS TOPIC
+IF CHECKPOINTS FAIL RESTART FLINK JOB
+EMERGENCY RECOVERY COMMAND KUBECTL ROLLOUT RESTART DEPLOYMENT ORDER PROCESSOR

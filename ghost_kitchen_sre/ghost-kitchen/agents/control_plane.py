@@ -22,30 +22,32 @@ class ControlState(TypedDict):
     action_plan: str
     suggested_value: int
 
+
 def call_rag_tool(state: ControlState):
-    """Consults the RAG Token Factory for runbook interpretation."""
-    # FIX: Use the specific metric key that Flink provides and the Runbook expects
-    # We default to 'p95_prep' as that is our primary Flink alert anchor
+    """Consults the RAG Service for runbook interpretation."""
     metric = "p95_prep" 
     value = state["alert"].get("p95_prep", 0.0)
     
     logger.info(f"🔍 Consulting RAG for {metric} with value {value}")
     
     try:
-        r = requests.get(RAG_ENDPOINT, params={"metric": metric, "value": value}, timeout=180)
+        # Note: Added 360s timeout to match your RAG service's heavy lifting
+        r = requests.get(RAG_ENDPOINT, params={"metric": metric, "value": value}, timeout=360)
         data = r.json()
         
-        # FIX: Aligning keys with your FastAPI response structure
+        # FIX: Pointing to the correct keys in the FastAPI response
         return {
-            "rag_insight": data.get("runbook_instruction", "No runbook instruction returned."),
-            "rag_metrics": data.get("factory_metrics", {})
+            "rag_insight": data.get("reasoning", "No runbook instruction found in RAG response."),
+            "rag_metrics": data.get("metrics", {})
         }
     except Exception as e:
         logger.error(f"RAG Tool Failure: {e}")
         return {
-            "rag_insight": "Critical: RAG Service Timeout. Defaulting to safe state.", 
+            "rag_insight": f"Critical: RAG Service Error. {str(e)}", 
             "rag_metrics": {"error": str(e)}
         }
+
+
 
 
 def analyze_policy(state: ControlState):
@@ -101,9 +103,9 @@ def run_agent():
             value_deserializer=lambda x: json.loads(x.decode('utf-8')),
             auto_offset_reset='latest',
             group_id='sre-control-plane-v1',
-            max_poll_interval_ms=300000, # Allow 5 mins of "thinking" time
-            session_timeout_ms=30000,    # 30s heartbeat timeout
-            heartbeat_interval_ms=10000  # Send heartbeat every 10s
+            max_poll_interval_ms=400000, # 400s (Higher than your 360s RAG timeout)
+            session_timeout_ms=60000,     # 60s (Allow more jitter in heartbeats)
+            heartbeat_interval_ms=20000   # Check in every 20s
         )
         producer = KafkaProducer(
             bootstrap_servers=BOOTSTRAP,
