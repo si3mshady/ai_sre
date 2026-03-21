@@ -1,131 +1,210 @@
-import json, os, time, pandas as pd, plotly.express as px, streamlit as st
-from kafka import KafkaConsumer
+import json
+import os
+import time
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+from kafka import KafkaConsumer, KafkaProducer
 from kubernetes import client, config
+from threading import Thread
 from collections import deque
 
 # --- CONFIG & THEME ---
-st.set_page_config(layout="wide", page_title="Elite SRE Token Factory", page_icon="🤖")
+st.set_page_config(layout="wide", page_title="Sentinel Control Plane", page_icon="🍳")
+
+# Professional SRE Dark Theme
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #ffffff; }
     [data-testid="stMetricValue"] { font-size: 1.8rem; color: #00ffcc; }
+    .agent-thought { 
+        background-color: #1e2127; 
+        border-left: 5px solid #00ffcc; 
+        padding: 15px; 
+        margin: 10px 0;
+        font-family: 'Courier New', Courier, monospace;
+        border-radius: 4px;
+    }
+    .trace-meta { color: #888; font-size: 0.8rem; margin-bottom: 5px; }
+    .node-pill { 
+        background-color: #00ffcc22; 
+        color: #00ffcc; 
+        padding: 2px 8px; 
+        border-radius: 10px; 
+        font-size: 0.7rem; 
+        text-transform: uppercase;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🍳 Elite Ghost Kitchen Command Center")
+# --- STATE MANAGEMENT (Persistent across Streamlit reruns) ---
+if "telemetry_history" not in st.session_state:
+    st.session_state.telemetry_history = deque(maxlen=100)
+if "agent_log_history" not in st.session_state:
+    st.session_state.agent_log_history = deque(maxlen=50)
+if "active_alerts" not in st.session_state:
+    st.session_state.active_alerts = {}
 
-# Initialize State
-if "data" not in st.session_state:
-    st.session_state.data = {
-        "orders": deque(maxlen=100),
-        "alerts": deque(maxlen=20),
-        "actions": deque(maxlen=50)
+# --- KAFKA CONFIG ---
+BOOTSTRAP = os.getenv('BOOTSTRAP_SERVERS', 'redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092')
+
+def get_producer():
+    return KafkaProducer(
+        bootstrap_servers=BOOTSTRAP,
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    )
+
+# --- THE BACKGROUND CONSUMER (The Live Feed) ---
+def kafka_consumer_thread():
+    """
+    This thread runs forever, pulling REAL data from Redpanda.
+    It updates st.session_state, which the main UI then renders.
+    """
+    consumer = KafkaConsumer(
+        't1_kitchen.telemetry',  # From Flink (Aggregated Metrics)
+        't1_kitchen.alerts',     # From Flink (Sustained Breaches)
+        't1_kitchen.agent_trace',# From Control Plane (ReAct Thoughts)
+        bootstrap_servers=BOOTSTRAP,
+        group_id='dashboard-v2-group',
+        auto_offset_reset='latest',
+        value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+    )
+    
+    for msg in consumer:
+        topic = msg.topic
+        data = msg.value
+        
+        if topic == 't1_kitchen.telemetry':
+            # Add to deque for plotting
+            st.session_state.telemetry_history.append(data)
+        
+        elif topic == 't1_kitchen.alerts':
+            station = data.get('station', 'unknown')
+            if data.get('alert_type') == 'SLO_VIOLATION':
+                st.session_state.active_alerts[station] = data
+            else:
+                # If alert_type is 'NORMAL', clear the alert from the dash
+                st.session_state.active_alerts.pop(station, None)
+        
+        elif topic == 't1_kitchen.agent_trace':
+            # This is the "Reasoning" data from your LangGraph Agent
+            st.session_state.agent_log_history.appendleft(data)
+
+# Ensure the consumer only starts once
+if "consumer_started" not in st.session_state:
+    thread = Thread(target=kafka_consumer_thread, daemon=True)
+    thread.start()
+    st.session_state.consumer_started = True
+
+# --- ACTION: TRIGGER MODES ---
+def send_control_signal(mode):
+    """Writes a command to the control topic for the Producer to pick up."""
+    producer = get_producer()
+    payload = {
+        "command": "SET_TRAFFIC_MODE",
+        "mode": mode,
+        "timestamp": time.time()
     }
+    producer.send('t1_kitchen.control', payload)
+    producer.flush()
+    st.toast(f"Cluster Mode Switched to {mode}", icon="🚀")
 
-# --- K8S OPERATORS ---
-def get_k8s_clients():
-    try:
-        config.load_incluster_config()
-    except:
-        config.load_kube_config()
-    return client.CoreV1Api(), client.AppsV1Api()
+# --- UI LAYOUT ---
+st.title("🍳 Sentinel: Autonomous SRE Control Plane")
 
-def fetch_k8s_events():
-    try:
-        core, _ = get_k8s_clients()
-        # Fetch last 15 events from the namespace
-        events = core.list_namespaced_event(namespace="kitchen-sre")
-        sorted_events = sorted(events.items, key=lambda x: x.last_timestamp or x.event_time or 0, reverse=True)
-        return [{"Time": e.last_timestamp, "Object": e.involved_object.name, "Reason": e.reason, "Message": e.message} for e in sorted_events[:15]]
-    except Exception as e:
-        return [{"Error": str(e)}]
+# SIDEBAR: The Chaos Controller
+with st.sidebar:
+    st.header("🕹️ Chaos Controller")
+    st.write("Trigger different traffic modes and observe the Agent's ReAct loop.")
+    
+    if st.button("🟢 STEADY STATE", use_container_width=True):
+        send_control_signal("STEADY")
+    
+    if st.button("🔴 LUNCH RUSH (Chaos)", use_container_width=True):
+        send_control_signal("LUNCH_RUSH")
+    
+    if st.button("⚡ BURST MODE", use_container_width=True):
+        send_control_signal("BURST")
+    
+    st.divider()
+    
+    st.subheader("⚠️ Active SLO Breaches")
+    if not st.session_state.active_alerts:
+        st.success("All Stations Healthy")
+    for station, alert in st.session_state.active_alerts.items():
+        st.error(f"**{station.upper()}**\np95: {alert['p95_prep']}s (Threshold: 8s)")
 
-def authorize_scale(deployment_name, replicas):
-    _, apps = get_k8s_clients()
-    mapping = {"fryer": "kitchen-producer", "sushi": "kitchen-agent", "grill": "kitchen-dashboard"}
-    real_name = mapping.get(deployment_name, "kitchen-producer")
-    try:
-        apps.patch_namespaced_deployment_scale(name=real_name, namespace="kitchen-sre", body={"spec": {"replicas": replicas}})
-        st.toast(f"🚀 Scaled {real_name} to {replicas}!")
-    except Exception as e:
-        st.error(f"K8s Error: {e}")
+# MAIN TABS
+tab_viz, tab_agent, tab_k8s = st.tabs(["📊 Live Telemetry", "🧠 Agent Reasoning", "☸️ Cluster State"])
 
-# --- KAFKA CONSUMER LOGIC ---
-@st.cache_resource
-def get_consumers():
-    bootstrap = os.getenv('BOOTSTRAP_SERVERS', 'redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092')
-    conf = {
-        'bootstrap_servers': bootstrap,
-        'value_deserializer': lambda x: json.loads(x.decode('utf-8')),
-        'auto_offset_reset': 'latest',
-        'consumer_timeout_ms': 50 # Fast timeout for UI responsiveness
-    }
-    return {
-        "orders": KafkaConsumer("t1_kitchen.orders", **conf),
-        "actions": KafkaConsumer("t1_kitchen.actions", **conf)
-    }
-
-# --- BACKGROUND DATA SYNC ---
-consumers = get_consumers()
-
-# Poll Orders
-for msg in consumers["orders"]:
-    st.session_state.data["orders"].append(msg.value)
-
-# Poll Actions/RAG Insights
-for msg in consumers["actions"]:
-    # Avoid duplicates
-    if not any(a.get('id') == msg.value.get('id') for a in st.session_state.data["actions"]):
-        st.session_state.data["actions"].append(msg.value)
-
-# --- TABS ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Monitoring", "⚠️ Alerts", "✅ Actions", "📝 K8s Events", "🧠 RAG Insights"])
-
-with tab1:
-    st.subheader("Real-time Kitchen Latency")
-    if len(st.session_state.data["orders"]) > 0:
-        df = pd.DataFrame(list(st.session_state.data["orders"]))
-        df['time'] = pd.to_datetime(df['timestamp'], unit='s')
-        fig = px.line(df, x='time', y='prep_time_required', color='station', template="plotly_dark")
+with tab_viz:
+    if st.session_state.telemetry_history:
+        # Convert deque to DataFrame for Plotly
+        df = pd.DataFrame(list(st.session_state.telemetry_history))
+        
+        # Top Metrics Row
+        m1, m2, m3 = st.columns(3)
+        latest = df.iloc[-1]
+        m1.metric("Station", latest['station'].upper())
+        m2.metric("p95 Latency", f"{latest['p95_prep']}s")
+        m3.metric("Load", f"{latest['order_count']} orders/win")
+        
+        # THE GRAPH (This is what you're asking for)
+        # Plotting p95_prep over time, colored by station
+        fig = px.line(
+            df, 
+            x='timestamp', 
+            y='p95_prep', 
+            color='station', 
+            title="Real-time Station Latency (Source: Redpanda)",
+            template="plotly_dark"
+        )
+        # Add a static red line at the 8s SLO breach point
+        fig.add_hline(y=8.0, line_dash="dash", line_color="red", annotation_text="SLO BREACH")
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Waiting for order stream... (Checking t1_kitchen.orders)")
+        st.info("🛰️ Waiting for telemetry from Flink/Redpanda... (Ensure Producer is running)")
 
-with tab3:
-    st.subheader("Pending Agent Proposals")
-    pending = [a for a in st.session_state.data["actions"] if a["status"] == "AWAITING_AUTH"]
-    if not pending:
-        st.write("No actions pending authorization.")
-    for i, action in enumerate(pending):
-        with st.expander(f"Action: {action['type']} for {action['target']}", expanded=True):
-            st.write(f"**Reasoning Chain:** {action['reason']}")
-            if st.button(f"Approve {action['type']} ##{i}", key=f"btn_{action['id']}"):
-                authorize_scale(action['target'], action['value'])
-                action["status"] = "AUTHORIZED"
-                st.rerun()
-
-with tab4:
-    st.subheader("Live Kubernetes Events (kitchen-sre)")
-    event_data = fetch_k8s_events()
-    st.table(event_data)
-
-with tab5:
-    st.subheader("Knowledge Base Reasoning (Token Factory)")
-    # RAG logs usually come tucked inside the 'actions' or 'alerts' if the agent is outputting them
-    rag_logs = [a for a in st.session_state.data["actions"] if "rag_metrics" in a]
+with tab_agent:
+    st.subheader("ReAct Thought Stream")
+    st.write("Live internal reasoning from the LangGraph Agent.")
     
-    if rag_logs:
-        for log in reversed(rag_logs):
-            cols = st.columns([1, 4, 1, 1])
-            metrics = log.get("rag_metrics", {})
-            cols[0].metric("Tokens", metrics.get("total_tokens", 0))
-            cols[1].info(f"**Target:** {log['target']} | **Reasoning:** {log['reason']}")
-            cols[2].metric("Latency", f"{metrics.get('latency_ms', 0)}ms")
-            cols[3].metric("TPS", metrics.get("tokens_per_sec", 0))
-            st.divider()
-    else:
-        st.info("No RAG reasoning logs captured yet. Check Agent logs for 'Read timed out' errors.")
+    if not st.session_state.agent_log_history:
+        st.info("No active remediation traces. System is nominal.")
+    
+    for log in st.session_state.agent_log_history:
+        with st.container():
+            st.markdown(f"""
+            <div class="agent-thought">
+                <div class="trace-meta">
+                    TRACE: {log.get('trace_id', 'N/A')} | 
+                    ITERATION: {log.get('iteration_count', 0)} | 
+                    <span class="node-pill">{log.get('node', 'reasoning')}</span>
+                </div>
+                <strong>Thought:</strong> {log.get('message', 'Processing logic...')}
+                <br><br>
+                <small style="color: #00ffcc;">Action Taken: {log.get('action_result', 'Awaiting Action')}</small>
+            </div>
+            """, unsafe_allow_html=True)
 
-# AUTO-REFRESH SCRIPT
-time.sleep(1)
+with tab_k8s:
+    st.subheader("Kubernetes Namespace Status")
+    try:
+        config.load_incluster_config()
+        apps_v1 = client.AppsV1Api()
+        deps = apps_v1.list_namespaced_deployment(namespace="kitchen-sre")
+        
+        for d in deps.items:
+            c1, c2, c3 = st.columns([2, 1, 1])
+            c1.write(f"**{d.metadata.name}**")
+            c2.write(f"Replicas: `{d.status.ready_replicas}/{d.spec.replicas}`")
+            # Visual health indicator
+            health = d.status.ready_replicas / d.spec.replicas if d.spec.replicas > 0 else 0
+            c3.progress(health)
+    except Exception as e:
+        st.warning("K8s API restricted or unavailable. Showing local telemetry only.")
+
+# --- RERUN LOOP ---
+# Streamlit reruns the script to update the UI
+time.sleep(1) 
 st.rerun()
