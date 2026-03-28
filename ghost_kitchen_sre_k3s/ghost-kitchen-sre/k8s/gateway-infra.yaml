@@ -23,7 +23,7 @@ metadata:
 spec:
   parentRefs:
   - name: kitchen-gateway
-  hostnames: ["sentinel-ops.duckdns.org"]
+    #hostnames: ["sentinel-ops.duckdns.org"]
   rules:
   - matches:
     - path: { type: PathPrefix, value: /api }
