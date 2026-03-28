@@ -38,5 +38,5 @@ spec:
   - matches:
     - path: { type: PathPrefix, value: / }
     backendRefs:
-    - name: kitchen-dashboard # Directs to your Streamlit UI
+    - name: dashboard-ui  # Directs to your Streamlit UI
       port: 8501
