@@ -1,0 +1,1000 @@
+  995  kubectl apply -f k8s/gateway-infra.yaml 
+  996  curl -I http://localhost:30080
+  997  kubectl patch gateway kitchen-gateway -n kitchen-sre --type='json' -p='[
+  998    {
+  999      "op": "replace",
+ 1000      "path": "/spec/listeners/0/port",
+ 1001      "value": 8000
+ 1002    }
+ 1003  ]'
+ 1004  kubectl get deploy traefik -n kube-system -o jsonpath='{.spec.template.spec.containers[0].args}'
+ 1005  cd
+ 1006  clear
+ 1007  # 1. Stop and completely uninstall the old K3s
+ 1008  sudo systemctl stop k3s
+ 1009  sudo /usr/local/bin/k3s-uninstall.sh
+ 1010  # 2. Fresh install: No Traefik, No ServiceLB, bind to your Public IP
+ 1011  curl -sfL https://get.k3s.io | sh -s - server   --no-deploy=traefik   --disable=servicelb   --node-ip=<YOUR_VM_PUBLIC_IP>
+ 1012  # 3. Configure kubectl for your user
+ 1013  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+ 1014  echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+ 1015  source ~/.bashrc
+ 1016  # 4. Verify the node is READY and showing your Public IP
+ 1017  kubectl get nodes -o wide
+ 1018  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1019  # Confirm the CRDs are there (should see gateway.networking.k8s.io)
+ 1020  kubectl get crd | grep gateway.networking
+ 1021  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1022  curl -sfL https://get.k3s.io | sh -s - server \
+ 1023  # Step 2: Gateway API CRDs
+ 1024  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1025  kubectl get crd | grep gateway.networking  # 20+ CRDs
+ 1026  # Step 3: Contour (Gateway API controller)
+ 1027  helm repo add projectcontour https://projectcontour.io/quickstart
+ 1028  helm repo update
+ 1029  helm install contour projectcontour/contour   --namespace projectcontour --create-namespace   --set gateway.enabled=true   --set envoy.service.type=LoadBalancer   --set envoy.loadBalancerIP=20.81.44.224
+ 1030  # 1. First, fully uninstall
+ 1031  sudo systemctl stop k3s
+ 1032  sudo /usr/local/bin/k3s-uninstall.sh
+ 1033  # 2. Create config file FIRST (this is the correct way)
+ 1034  sudo mkdir -p /etc/rancher/k3s
+ 1035  sudo tee /etc/rancher/k3s/config.yaml > /dev/null <<EOF
+ 1036  token: my-cluster-token
+ 1037  disable:
+ 1038    - servicelb
+ 1039    - traefik
+ 1040  node-ip: 20.81.44.224
+ 1041  EOF
+ 1042  # 3. NOW install (no flags needed - reads config.yaml)
+ 1043  curl -sfL https://get.k3s.io | sh -
+ 1044  # 4. Verify + setup kubectl
+ 1045  sudo systemctl status k3s  # Should be active
+ 1046  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+ 1047  echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+ 1048  kubectl get nodes -o wide  # Shows your IP 20.81.44.224
+ 1049  # Step 2: Gateway API CRDs
+ 1050  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1051  kubectl get crd | grep gateway.networking  # 20+ CRDs
+ 1052  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+ 1053  echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+ 1054  kubectl get nodes -o wide  # Shows your IP 20.81.44.224
+ 1055  # Option 1: Copy to user home (Recommended - secure)
+ 1056  mkdir -p ~/.kube
+ 1057  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+ 1058  sudo chown $(whoami):$(whoami) ~/.kube/config
+ 1059  export KUBECONFIG=~/.kube/config
+ 1060  echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+ 1061  # Test it works
+ 1062  kubectl get nodes -o wide
+ 1063  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1064  kubectl get crd | grep gateway.networking  # 20+ CRDs
+ 1065  # 1. Get the RAW kubeconfig with correct server address
+ 1066  sudo k3s kubectl config view --raw > ~/.kube/temp-config
+ 1067  # 2. Fix ownership and test
+ 1068  sudo chown $(whoami):$(whoami) ~/.kube/temp-config
+ 1069  mv ~/.kube/temp-config ~/.kube/config
+ 1070  kubectl get nodes -o wide
+ 1071  echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+ 1072  source ~/.bashrc
+ 1073  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1074  kubectl get crd | grep gateway.networking  # Should show 20+ CRDs
+ 1075  kubectl get nodes -o wide
+ 1076  # Get LIVE K3s config with correct server address (20.81.44.224:6443)
+ 1077  sudo k3s kubectl config view --raw > ~/.kube/config-fix
+ 1078  # Fix permissions and activate
+ 1079  sudo chown $USER:$USER ~/.kube/config-fix
+ 1080  mv ~/.kube/config-fix ~/.kube/config
+ 1081  export KUBECONFIG=~/.kube/config
+ 1082  kubectl get nodes -o wide
+ 1083  kubectl get gatewayclasses.gateway.networking.k8s.io
+ 1084  mkdir -p ~/.kube
+ 1085  echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
+ 1086  source ~/.bashrc
+ 1087  kubectl apply -f https://projectcontour.io/quickstart/contour/1.30.2/contour-gateway-class.yaml
+ 1088  kubectl apply -f https://projectcontour.io/quickstart/contour/1.30.2/contour-gateway.yaml
+ 1089  cd ai_sre/
+ 1090  # First install Contour core
+ 1091  kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
+ 1092  # Install Gateway API CRDs
+ 1093  kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour/release-1.30/examples/gateway/00-crds.yaml
+ 1094  # Create GatewayClass (inline YAML)
+ 1095  kubectl apply -f - <<EOF
+ 1096  apiVersion: gateway.networking.k8s.io/v1
+ 1097  kind: GatewayClass
+ 1098  metadata:
+ 1099    name: contour
+ 1100  spec:
+ 1101    controllerName: projectcontour.io/gateway-controller
+ 1102  EOF
+ 1103  # Create projectcontour namespace + Gateway
+ 1104  kubectl apply -f - <<EOF
+ 1105  apiVersion: v1
+ 1106  kind: Namespace
+ 1107  metadata:
+ 1108    name: projectcontour
+ 1109  ---
+ 1110  apiVersion: gateway.networking.k8s.io/v1
+ 1111  kind: Gateway
+ 1112  metadata:
+ 1113    name: contour
+ 1114    namespace: projectcontour
+ 1115  spec:
+ 1116    gatewayClassName: contour
+ 1117    listeners:
+ 1118    - name: http
+ 1119      protocol: HTTP
+ 1120      port: 80
+ 1121      allowedRoutes:
+ 1122        namespaces:
+ 1123          from: All
+ 1124  EOF
+ 1125  # Apply CRDs and manifests with validation disabled
+ 1126  kubectl apply -f https://raw.githubusercontent.com/projectcontour/contour/release-1.30/examples/gateway/00-crds.yaml --validate=false
+ 1127  # Apply GatewayClass (inline)
+ 1128  kubectl apply -f - <<EOF --validate=false
+ 1129  apiVersion: gateway.networking.k8s.io/v1
+ 1130  kind: GatewayClass
+ 1131  metadata:
+ 1132    name: contour
+ 1133  spec:
+ 1134    controllerName: projectcontour.io/gateway-controller
+ 1135  EOF
+ 1136  # Apply projectcontour namespace + Gateway (inline)  
+ 1137  kubectl apply -f - <<EOF --validate=false
+ 1138  apiVersion: v1
+ 1139  kind: Namespace
+ 1140  metadata:
+ 1141    name: projectcontour
+ 1142  ---
+ 1143  apiVersion: gateway.networking.k8s.io/v1
+ 1144  kind: Gateway
+ 1145  metadata:
+ 1146    name: contour
+ 1147    namespace: projectcontour
+ 1148  spec:
+ 1149    gatewayClassName: contour
+ 1150    listeners:
+ 1151    - name: http
+ 1152      protocol: HTTP
+ 1153      port: 80
+ 1154      allowedRoutes:
+ 1155        namespaces:
+ 1156          from: All
+ 1157  EOF
+ 1158  # 1. Check if K3s is running
+ 1159  sudo systemctl status k3s
+ 1160  # or if using k3d/docker desktop:
+ 1161  k3d cluster list
+ 1162  docker ps | grep k3s
+ 1163  # 2. Fix kubeconfig - point to correct server
+ 1164  sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl config view --raw > ~/.kube/config
+ 1165  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+ 1166  # Edit ~/.kube/config - change server: https://127.0.0.1:6443 to your actual IP:
+ 1167  # sed -i 's/127.0.0.1/[YOUR_ACTUAL_IP]/g' ~/.kube/config
+ 1168  # 3. Test connection
+ 1169  kubectl get nodes
+ 1170  kubectl cluster-info
+ 1171  mkdir -p ~/.kube
+ 1172  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+ 1173  sudo chown $USER:$USER ~/.kube/config
+ 1174  export KUBECONFIG=~/.kube/config
+ 1175  echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
+ 1176  source ~/.bashrc
+ 1177  kubectl get nodes
+ 1178  # CRDs
+ 1179  curl -o crds.yaml https://raw.githubusercontent.com/projectcontour/contour/release-1.30/examples/gateway/00-crds.yaml
+ 1180  kubectl apply -f crds.yaml
+ 1181  # Core Contour
+ 1182  kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
+ 1183  # GatewayClass + Gateway
+ 1184  cat <<EOF | kubectl apply -f -
+ 1185  apiVersion: v1
+ 1186  kind: Namespace
+ 1187  metadata:
+ 1188    name: projectcontour
+ 1189  ---
+ 1190  apiVersion: gateway.networking.k8s.io/v1
+ 1191  kind: GatewayClass
+ 1192  metadata:
+ 1193    name: contour
+ 1194  spec:
+ 1195    controllerName: projectcontour.io/gateway-controller
+ 1196  ---
+ 1197  apiVersion: gateway.netting.k8s.io/v1
+ 1198  kind: Gateway
+ 1199  metadata:
+ 1200    name: contour
+ 1201    namespace: projectcontour
+ 1202  spec:
+ 1203    gatewayClassName: contour
+ 1204    listeners:
+ 1205    - name: http
+ 1206      protocol: HTTP
+ 1207      port: 80
+ 1208      allowedRoutes:
+ 1209        namespaces:
+ 1210          from: All
+ 1211  EOF
+ 1212  # 1. Install official Gateway API CRDs (fixes "no matches for kind Gateway")
+ 1213  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+ 1214  # 2. Verify CRDs installed
+ 1215  kubectl get crd | grep gateway.networking.k8s.io
+ 1216  # Should show: gateways.gateway.networking.k8s.io, gatewayclasses.gateway.networking.k8s.io
+ 1217  # 3. Wait 30s for CRDs to be ready, then retry your Gateway
+ 1218  cat <<EOF | kubectl apply -f -
+ 1219  apiVersion: v1
+ 1220  kind: Namespace
+ 1221  metadata:
+ 1222    name: projectcontour
+ 1223  ---
+ 1224  apiVersion: gateway.networking.k8s.io/v1
+ 1225  kind: GatewayClass
+ 1226  metadata:
+ 1227    name: contour
+ 1228  spec:
+ 1229    controllerName: projectcontour.io/gateway-controller
+ 1230  ---
+ 1231  apiVersion: gateway.networking.k8s.io/v1
+ 1232  kind: Gateway
+ 1233  metadata:
+ 1234    name: contour
+ 1235    namespace: projectcontour
+ 1236  spec:
+ 1237    gatewayClassName: contour
+ 1238    listeners:
+ 1239    - name: http
+ 1240      protocol: HTTP
+ 1241      port: 80
+ 1242      allowedRoutes:
+ 1243        namespaces:
+ 1244          from: All
+ 1245  EOF
+ 1246  # 1. Check if K3s is running
+ 1247  sudo systemctl status k3s
+ 1248  # If stopped/inactive:
+ 1249  sudo systemctl start k3s
+ 1250  sudo systemctl enable k3s
+ 1251  # 2. Fix kubeconfig permissions (common K3s issue)
+ 1252  mkdir -p ~/.kube
+ 1253  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+ 1254  sudo chown $(whoami):$(whoami) ~/.kube/config
+ 1255  chmod 600 ~/.kube/config
+ 1256  export KUBECONFIG=~/.kube/config
+ 1257  # 3. Test kubectl connectivity
+ 1258  kubectl get nodes
+ 1259  # 4. NOW install Gateway API CRDs (skip --validate)
+ 1260  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml --validate=false
+ 1261  # 5. Verify CRDs ready (wait 30s)
+ 1262  kubectl get crd | grep gateway.networking.k8s.io
+ 1263  # 6. Retry your Contour Gateway resource
+ 1264  cat <<EOF | kubectl apply -f -
+ 1265  apiVersion: gateway.networking.k8s.io/v1
+ 1266  kind: GatewayClass
+ 1267  metadata:
+ 1268    name: contour
+ 1269  spec:
+ 1270    controllerName: projectcontour.io/gateway-controller
+ 1271  EOF
+ 1272  cclear
+ 1273  # Save as uninstall-k3s.sh, chmod +x, then run with sudo if prompted
+ 1274  set -x
+ 1275  sudo systemctl stop k3s || true
+ 1276  sudo systemctl disable k3s || true
+ 1277  sudo systemctl daemon-reload
+ 1278  sudo rm -f /etc/systemd/system/k3s.service
+ 1279  sudo rm -f /usr/local/bin/k3s /usr/local/bin/kubectl /usr/local/bin/crictl
+ 1280  sudo rm -rf /var/lib/rancher/k3s /etc/rancher/k3s
+ 1281  sudo rm -f /usr/local/bin/k3s-uninstall.sh
+ 1282  sudo umount $(mount | grep k3s | awk '{print $3}') || true
+ 1283  curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -
+ 1284  mkdir -p ~/.kube
+ 1285  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+ 1286  sudo chown $(whoami):$(whoami) ~/.kube/config
+ 1287  export KUBECONFIG=~/.kube/config
+ 1288  echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
+ 1289  k3s kubectl get nodes
+ 1290  kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.15.5/manifests/namespace.yaml
+ 1291  kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.15.5/manifests/metallb.yaml
+ 1292  # Add Helm repo and install
+ 1293  helm repo add metallb https://metallb.github.io/metallb
+ 1294  helm repo update
+ 1295  helm install metallb metallb/metallb -n metallb-system --create-namespace
+ 1296  kubectl get pods -n metallb-system
+ 1297  kubectl get svc -n metallb-system
+ 1298  vi metal_lb_config.yaml
+ 1299  kubectl apply -f metal_lb_config.yaml wq
+ 1300  kubectl apply -f metal_lb_config.yaml 
+ 1301  kubectl get svc -n metallb-system
+ 1302  kubectl get pods -n metallb-system
+ 1303  kubectl get ipaddresspools.config.pools.metallb.io -n metallb-system
+ 1304  kubectl get l2advertisements.metallb.io -n metallb-system
+ 1305  # CORRECT command for IP pools
+ 1306  kubectl get ipaddresspools -n metallb-system
+ 1307  # L2Advertisement looks good (already created successfully)
+ 1308  kubectl get l2advertisements -n metallb-system
+ 1309  kubectl get svc -n metallb-system.
+ 1310  kubectl get svc -n metallb-system
+ 1311  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+ 1312  helm repo add projectcontour https://projectcontour.io/quickstart
+ 1313  helm repo update
+ 1314  # Remove wrong repo and add correct one
+ 1315  helm repo remove projectcontour
+ 1316  helm repo add contour https://projectcontour.github.io/helm-charts/
+ 1317  helm repo update
+ 1318  helm repo list | grep contour
+ 1319  helm search repo contour
+ 1320  helm install contour contour/contour -n projectcontour --create-namespace   --set envoy.service.type=LoadBalancer   --set contour.image.pullPolicy=Always
+ 1321  kubectl get pods -n projectcontour
+ 1322  kubectl get svc -n projectcontour
+ 1323  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+ 1324  vi countour-controller.yaml
+ 1325  kubectl apply con:
+ 1326  kubectl apply con
+ 1327  ls -lrth
+ 1328  kubectl apply -f co
+ 1329  ls -lrth
+ 1330  kubectl apply -f countour-controller.yaml
+ 1331  kubectl get gateway -n projectcontour
+ 1332  clear
+ 1333  cd ghost_kitchen
+ 1334  cd ../ghost_kitchen_sre
+ 1335  clear
+ 1336  ls -lrth
+ 1337  cd ghost-kitchen/
+ 1338  ls -lrth
+ 1339  cd cd ../ghost-kitchen_
+ 1340  history | grep restart
+ 1341  sudo systemctl restart xrdp
+ 1342  clera
+ 1343  clear
+ 1344  cd 
+ 1345  cd ai_sre/
+ 1346  cd ghost_kitchen
+ 1347  cd 
+ 1348  clear
+ 1349  ls -lrth
+ 1350  cd ai_sre/ghost_kitchen_sre
+ 1351  cd ../ghost_kitchen_sre_k3s/
+ 1352  cd ghost-kitchen-sre/
+ 1353  clear
+ 1354  ls -lrth
+ 1355  cd k8s/
+ 1356  ls -lrth
+ 1357  vi traefik-gatewayclass.yaml 
+ 1358  vi gateway-infra.yaml 
+ 1359  > gateway-infra.yaml 
+ 1360  vi gateway-infra.yaml 
+ 1361  vi app-deployments.yaml 
+ 1362  cat app-deployments.yaml 
+ 1363  ls -lrth
+ 1364  kubectl delete -f 
+ 1365  kubectl delete -f .
+ 1366  ls -lrth
+ 1367  > gateway-infra.yaml 
+ 1368  vi gateway-infra.yaml 
+ 1369  mv gateway-infra.yaml dashboard-gateway-infra.yaml 
+ 1370  ls -lrth
+ 1371  rm traefik-*
+ 1372  clear
+ 1373  ls -lrth
+ 1374  rm traefik*
+ 1375  clear
+ 1376  ls -lrth
+ 1377  rm keda-scaling.yaml 
+ 1378  ls -lrth
+ 1379  clear
+ 1380  ls -lrth
+ 1381  vi app-deployments.yaml 
+ 1382  kubectl apply -f .
+ 1383  cd .../
+ 1384  kubectl delete  -f .
+ 1385  kubectl apply -f .
+ 1386  kubectl delete  -f .
+ 1387  kubectl apply -f .
+ 1388  # Check new EXTERNAL-IP
+ 1389  kubectl get svc contour-envoy -n projectcontour
+ 1390  # Test Contour health (should return 200 OK)
+ 1391  curl -v http://20.81.44.225  # Use NEW IP from above
+ 1392  # Check new EXTERNAL-IP
+ 1393  kubectl get svc contour-envoy -n projectcontour
+ 1394  # Test Contour health (should return 200 OK)
+ 1395  curl -v http://20.81.44.225  # Use NEW IP from above
+ 1396  kubectl get svc contour-envoy -n projectcontour
+ 1397  # Check if port 80 is bound locally
+ 1398  sudo netstat -tlnp | grep :80
+ 1399  # Check Envoy pod logs for startup errors
+ 1400  kubectl logs -n projectcontour contour-envoy-7h577 -f
+ 1401  # Test FROM the VM itself to its own IP
+ 1402  curl -v -H "Host: sentinel-ops.duckdns.org" http://20.81.44.224
+ 1403  # Test port connectivity
+ 1404  sudo nc -zv 20.81.44.224 80
+ 1405  kubectl get gateway kitchen-gateway -n projectcontour
+ 1406  helm upgrade contour contour/contour -n projectcontour   --reuse-values   --set envoy.service.ports[0].name=http   --set envoy.service.ports[0].port=80   --set envoy.service.ports[0].targetPort=8080   --set envoy.service.ports[1].name=https   --set envoy.service.ports[1].port=443   --set envoy.service.ports[1].targetPort=8443   --set-string contour.config.gateway.gatewayRef.selector='{}'
+ 1407  # Patch contour-envoy service to map port 80→8080
+ 1408  kubectl patch svc contour-envoy -n projectcontour -p='{
+ 1409    "spec": {
+ 1410      "ports": [
+ 1411        {
+ 1412          "name": "http",
+ 1413          "port": 80,
+ 1414          "protocol": "TCP", 
+ 1415          "targetPort": 8080
+ 1416        },
+ 1417        {
+ 1418          "name": "https",
+ 1419          "port": 443,
+ 1420          "protocol": "TCP",
+ 1421          "targetPort": 8443
+ 1422        }
+ 1423      ]
+ 1424    }
+ 1425  }'
+ 1426  # Restart Envoy daemonset
+ 1427  kubectl rollout restart daemonset contour-envoy -n projectcontour
+ 1428  # Deploy complete Gateway stack
+ 1429  kubectl apply -f- <<EOF
+ 1430  apiVersion: gateway.networking.k8s.io/v1
+ 1431  kind: GatewayClass
+ 1432  metadata:
+ 1433    name: contour
+ 1434  spec:
+ 1435    controllerName: projectcontour.io/gateway-controller
+ 1436  ---
+ 1437  apiVersion: gateway.networking.k8s.io/v1
+ 1438  kind: Gateway
+ 1439  metadata:
+ 1440    name: kitchen-gateway
+ 1441    namespace: projectcontour
+ 1442  spec:
+ 1443    gatewayClassName: contour
+ 1444    listeners:
+ 1445    - name: web
+ 1446      protocol: HTTP
+ 1447      port: 80
+ 1448      allowedRoutes:
+ 1449        namespaces:
+ 1450          from: All
+ 1451  EOF
+ 1452  # Wait 45 seconds
+ 1453  sleep 45
+ 1454  # 1. Port 80 listening?
+ 1455  sudo netstat -tlnp | grep :80
+ 1456  # 2. Gateway programmed?
+ 1457  kubectl get gateway kitchen-gateway -n projectcontour
+ 1458  # 3. Contour alive?
+ 1459  curl -v http://20.81.44.224
+ 1460  # 4. Dashboard routing?
+ 1461  curl -v -H "Host: sentinel-ops.duckdns.org" http://20.81.44.224
+ 1462  cd
+ 1463  # 1. Check if K3s is running
+ 1464  sudo systemctl status k3s
+ 1465  # If stopped/inactive:
+ 1466  sudo systemctl start k3s
+ 1467  sudo systemctl enable k3s
+ 1468  # 2. Fix kubeconfig permissions (common K3s issue)
+ 1469  mkdir -p ~/.kube
+ 1470  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+ 1471  sudo chown $(whoami):$(whoami) ~/.kube/config
+ 1472  chmod 600 ~/.kube/config
+ 1473  export KUBECONFIG=~/.kube/config
+ 1474  # 3. Test kubectl connectivity
+ 1475  kubectl get nodes
+ 1476  # 4. NOW install Gateway API CRDs (skip --validate)
+ 1477  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml --validate=false
+ 1478  # 5. Verify CRDs ready (wait 30s)
+ 1479  kubectl get crd | grep gateway.networking.k8s.io
+ 1480  # 6. Retry your Contour Gateway resource
+ 1481  cat <<EOF | kubectl apply -f -
+ 1482  apiVersion: gateway.networking.k8s.io/v1
+ 1483  kind: GatewayClass
+ 1484  metadata:
+ 1485    name: contour
+ 1486  spec:
+ 1487    controllerName: projectcontour.io/gateway-controller
+ 1488  EOF
+ 1489  # Install Gateway API CRDs (required first)
+ 1490  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+ 1491  # Install Contour with Gateway API enabled (creates projectcontour namespace)
+ 1492  helm repo add projectcontour https://projectcontour.io/quickstart
+ 1493  helm install contour projectcontour/contour -n projectcontour --create-namespace   --set gateway.enabled=true   --set gateway.provisionerName=contour
+ 1494  kubectl get pods -A
+ 1495  kubectl get pods -A -w
+ 1496  kubectl get pods -A
+ 1497  kubectl logs  kitchen-dashboard-6d9457fbbc-9ck68 -n kitchen-sre
+ 1498  kubectl describe pod   kitchen-dashboard-6d9457fbbc-9ck68 -n kitchen-sre
+ 1499  # Create containerd config for gVisor
+ 1500  sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
+ 1501  sudo tee /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl > /dev/null <<'EOF'
+ 1502  {{ template "base" . }}
+ 1503  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+ 1504    runtime_type = "io.containerd.runsc.v1"
+ 1505  EOF
+ 1506  # Restart K3s (pods will reschedule)
+ 1507  sudo systemctl restart k3s
+ 1508  # Wait 60s, check K3s
+ 1509  sudo k3s kubectl get pods --all-namespaces
+ 1510  sudo k3s kubectl get nodes
+ 1511  sudo k3s kubectl get pods --all-namespaces
+ 1512  kubectl describe pod   kitchen-dashboard-6d9457fbbc-9ck68 -n kitchen-sre
+ 1513  sudo k3s kubectl get pods --all-namespaces
+ 1514  sudo k3s kubectl get svc --all-namespaces
+ 1515  sudo k3s kubectl get pods --all-namespaces
+ 1516  curl -H "Host: sentinel-ops.duckdns.org" http://20.81.44.224
+ 1517  cd ai_sre/
+ 1518  ls -lrth
+ 1519  cat metal_lb_config.yaml 
+ 1520  > metal_lb_config.yaml 
+ 1521  vi metal_lb_config.yaml 
+ 1522  # Get current VM IP (confirm it's 20.81.44.224)
+ 1523  ip addr show
+ 1524  # Update MetalLB pool to exclude VM IP
+ 1525  cat > metallb-fix.yaml <<EOF
+ 1526  apiVersion: metallb.io/v1beta1
+ 1527  kind: IPAddressPool
+ 1528  metadata:
+ 1529    name: default-pool
+ 1530    namespace: metallb-system
+ 1531  spec:
+ 1532    addresses:
+ 1533    - 20.81.44.225-20.81.44.230  # EXCLUDES 20.81.44.224 (VM IP)
+ 1534  ---
+ 1535  apiVersion: metallb.io/v1beta1
+ 1536  kind: L2Advertisement
+ 1537  metadata:
+ 1538    name: default
+ 1539    namespace: metallb-system
+ 1540  spec:
+ 1541    ipAddressPools:
+ 1542    - default-pool
+ 1543  EOF
+ 1544  kubectl apply -f metallb-fix.yaml
+ 1545  ls -lrth
+ 1546  # Stop + remove K3s
+ 1547  sudo /usr/local/bin/k3s-uninstall.sh || true
+ 1548  sudo systemctl stop k3s* || true
+ 1549  sudo rm -rf /etc/rancher/k3s /var/lib/rancher/k3s ~/.kube/config
+ 1550  sudo rm -f /usr/local/bin/k3s* /usr/local/bin/helm
+ 1551  sudo reboot  # Clean reboot
+ 1552  cd  
+ 1553  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/
+ 1554  ls -lrth
+ 1555  cd k8s/
+ 1556  ls -lrth
+ 1557  cat app-deployments.yaml 
+ 1558  ls -lrth
+ 1559  > dashboard-gateway-infra.yaml 
+ 1560  vi dashboard-gateway-infra.yaml 
+ 1561  vi app-deployments.yaml 
+ 1562  cd ../
+ 1563  kubectl apply -f k8s/
+ 1564  kubectl get pods -A 
+ 1565  clear
+ 1566  kubectl get pods -n kitchen-sre
+ 1567  kubectl get svc -n kitchen-sre
+ 1568  kubectl get svc -A
+ 1569  kubectl get ns -A
+ 1570  kubect get context
+ 1571  kubectl get context
+ 1572  kubectl cluster-info --context kind-kind
+ 1573  kubectl get node
+ 1574  kubectl get pods -A
+ 1575  ls -lrth
+ 1576  cd k8s/
+ 1577  ls -lrth
+ 1578  cat dashboard-gateway-infra.yaml 
+ 1579  kubectl delete -f k8s/
+ 1580  kubectl delete -f .
+ 1581  clear
+ 1582  ls -lrth
+ 1583  cat dashboard-gateway-infra.yaml 
+ 1584  clear
+ 1585  cat app-deployments.yaml 
+ 1586  ls -lrth
+ 1587  > dashboard-gateway-infra.yaml 
+ 1588  vi dashboard-gateway-infra.yaml 
+ 1589  kubectl apply -f .
+ 1590  kubectl get gateway -n kitchen-sre
+ 1591  kubectl describe gateway kitchen-gateway -n kitchen-sre
+ 1592  kubectl get gatewayclass cloud-provider-kind -o jsonpath='{.spec.controllerName}'
+ 1593  kubectl config current-context
+ 1594  # 1. Kill the current process
+ 1595  sudo pkill cloud-provider-kind
+ 1596  # 2. Delete the stuck resources
+ 1597  kubectl delete gateway kitchen-gateway -n kitchen-sre
+ 1598  kubectl delete gatewayclass cloud-provider-kind
+ 1599  # 3. Wipe the Docker network "junk"
+ 1600  docker ps -a | grep kindccm-gw | awk '{print $1}' | xargs -r docker rm -f
+ 1601  # Force kill any lingering instances
+ 1602  sudo pkill -f cloud-provider-kind
+ 1603  # Start the source-built binary
+ 1604  sudo ./bin/cloud-provider-kind   --cluster="kind"   --kubeconfig=$HOME/.kube/config   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1605  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1606  clear
+ 1607  kubectl delete -f .
+ 1608  kubectl apply -f .
+ 1609  kubectl delete -f .
+ 1610  kubectl apply -f .
+ 1611  kubectl get gateway -n kitchen-sre
+ 1612  kubectl describe gateway kitchen-gateway -n kitchen-sre
+ 1613  kubectl get gateway -n kitchen-sre
+ 1614  # Delete the broken cluster
+ 1615  kind delete cluster
+ 1616  # Create a mature v1.30 cluster directly from the CLI
+ 1617  kind create cluster --image kindest/node:v1.30.4
+ 1618  kind delete cluster
+ 1619  kind create cluster --image kindest/node:v1.30.4
+ 1620  kind delete cluster
+ 1621  sudo pkill -f cloud-provider-kind
+ 1622  kind delete cluster
+ 1623  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+ 1624  kubectl apply -f .
+ 1625  ls -lrth
+ 1626  vi dashboard-gateway-infra.yaml 
+ 1627  kubectl apply -f .
+ 1628  kubectl get gateway -n kitchen-sre
+ 1629  kubectl get gatewayclass
+ 1630  vi dashboard-gateway-infra.yaml 
+ 1631  vi gateway-class.yaml
+ 1632  kubectl apply -f .
+ 1633  kubectl get gatewayclass
+ 1634  kubectl delete -f .
+ 1635  kubectl apply -f .
+ 1636  kubectl get gatewayclass
+ 1637  kubectl describe  gatewayclass cloud-provider-kind
+ 1638  kubectl get gateway -n kitchen-sre
+ 1639  clear
+ 1640  cd
+ 1641  claer
+ 1642  clear
+ 1643  kind create cluster
+ 1644  # Install kind via Go
+ 1645  go install sigs.k8s.io/kind@v0.22.0
+ 1646  # Move it to your path so 'kind' works as a command
+ 1647  sudo cp $(go env GOPATH)/bin/kind /usr/local/bin/kind
+ 1648  kind
+ 1649  ckear
+ 1650  clear
+ 1651  kind create cluster
+ 1652  kind delete cluster
+ 1653  kind create cluster --image kindest/node:v1.27.3@sha256:3966cd761ae0136263fc0bc73c4fdec59d92823628ef3af78749f993f93d4a41
+ 1654  kind create cluster --image kindest/node:v1.31.2
+ 1655  kubectl get nodes
+ 1656  kind get nodes
+ 1657  kind get pods
+ 1658  kubectl cluster-info --context kind-kind
+ 1659  # Download the latest stable release
+ 1660  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+ 1661  # Make it executable and move it to your path
+ 1662  chmod +x ./kubectl
+ 1663  sudo mv ./kubectl /usr/local/bin/kubectl
+ 1664  kubectl get nodes
+ 1665  ls -lrth
+ 1666  kind create cluster --image kindest/node:v1.30.4
+ 1667  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+ 1668  cd 
+ 1669  git clone https://github.com/kubernetes-sigs/cloud-provider-kind.git
+ 1670  Cloning into 'cloud-provider-kind'...
+ 1671  remote: Enumerating objects: 6779, done.
+ 1672  remote: Counting objects: 100% (6779/6779), done.
+ 1673  remote: Compressing objects: 100% (4225/4225), done.q
+ 1674  remote: Total 6779 (delta 2150), reused 6755 (delta 2135), pack-reused 0
+ 1675  Receiving objects: 100% (6779/6779), 9.05 MiB | 1.83 MiB/s, done.
+ 1676  Resolving deltas: 100% (2150/2150), done.
+ 1677  cd cloud-provider-kind && make
+ 1678  sudo mv ./bin/cloud-provider-kind  /usr/local/bin/cloud-provider-kind
+ 1679  sudo apt install make
+ 1680  cd ../
+ 1681  ls -lrth
+ 1682  rm -rf cloud-provider-kind/
+ 1683  git clone https://github.com/kubernetes-sigs/cloud-provider-kind.git
+ 1684  Cloning into 'cloud-provider-kind'...
+ 1685  remote: Enumerating objects: 6779, done.
+ 1686  remote: Counting objects: 100% (6779/6779), done.
+ 1687  remote: Compressing objects: 100% (4225/4225), done.q
+ 1688  remote: Total 6779 (delta 2150), reused 6755 (delta 2135), pack-reused 0
+ 1689  Receiving objects: 100% (6779/6779), 9.05 MiB | 1.83 MiB/s, done.
+ 1690  Resolving deltas: 100% (2150/2150), done.
+ 1691  cd cloud-provider-kind && make
+ 1692  sudo mv ./bin/cloud-provider-kind  /usr/local/bin/cloud-provider-kind
+ 1693  go install sigs.k8s.io/cloud-provider-kind@latest
+ 1694  clear
+ 1695  cd ../
+ 1696  ls -lrth
+ 1697  rm -rf cloud-provider-kind/
+ 1698  git clone https://github.com/kubernetes-sigs/cloud-provider-kind.git
+ 1699  cd cloud-provider-kind && make
+ 1700  sudo mv ./bin/cloud-provider-kind  /usr/local/bin/cloud-provider-kind
+ 1701  ls
+ 1702  sudo add-apt-repository ppa:longsleep/golang-backports -y
+ 1703  sudo apt update
+ 1704  sudo apt install golang-go -y
+ 1705  cd ../
+ 1706  ls -lrth
+ 1707  rm -rf cloud-provider-kind/
+ 1708  git clone https://github.com/kubernetes-sigs/cloud-provider-kind.git
+ 1709  Cloning into 'cloud-provider-kind'...
+ 1710  remote: Enumerating objects: 6779, done.
+ 1711  remote: Counting objects: 100% (6779/6779), done.
+ 1712  remote: Compressing objects: 100% (4225/4225), done.q
+ 1713  remote: Total 6779 (delta 2150), reused 6755 (delta 2135), pack-reused 0
+ 1714  Receiving objects: 100% (6779/6779), 9.05 MiB | 1.83 MiB/s, done.
+ 1715  Resolving deltas: 100% (2150/2150), done.
+ 1716  cd cloud-provider-kind && make
+ 1717  sudo mv ./bin/cloud-provider-kind  /usr/local/bin/cloud-provider-kind
+ 1718  /usr/local/bin/k3s-uninstall.sh
+ 1719  sudo systemctl stop k3s && sudo rm -rf /var/lib/rancher/k3s /etc/rancher/k3s /run/k3s /var/run/k3s && sudo ip link delete cni0 && sudo ip link delete flannel.1
+ 1720  clear
+ 1721  kind create cluster
+ 1722  /usr/local/bin/cloud-provider-kind
+ 1723  /usr/local/bin/cloud-provider-kind --enable-default-ingress="true" --enable-lb-port-mappings-"true" --gateway-channel="standard"
+ 1724  clear
+ 1725  /usr/local/bin/cloud-provider-kind --enable-default-ingress="true" --enable-lb-port-mapping-"true" --gateway-channel="standard"
+ 1726  /usr/local/bin/cloud-provider-kind
+ 1727  /usr/local/bin/cloud-provider-kind --enable-default-ingress="true" --enable-lb-port-mapping="true" --gateway-channel="standard"
+ 1728  # 1. Kill the current (failing) process
+ 1729  sudo pkill cloud-provider-kind
+ 1730  # 2. Download the newest binary (2026 stable release)
+ 1731  curl -Lo cloud-provider-kind https://github.com/kubernetes-sigs/cloud-provider-kind/releases/latest/download/cloud-provider-kind-linux-amd64
+ 1732  # 3. Install it
+ 1733  chmod +x cloud-provider-kind
+ 1734  sudo mv cloud-provider-kind /usr/local/bin/cloud-provider-kind
+ 1735  # 4. Start it back up
+ 1736  sudo /usr/local/bin/cloud-provider-kind --verbosity=3
+ 1737  history
+ 1738  clear
+ 1739  # 1. Kill the current (failing) process
+ 1740  sudo pkill cloud-provider-kind
+ 1741  # 2. Download the newest binary (2026 stable release)
+ 1742  curl -Lo cloud-provider-kind https://github.com/kubernetes-sigs/cloud-provider-kind/releases/latest/download/cloud-provider-kind-linux-amd64
+ 1743  cd
+ 1744  # 1. Kill the current (failing) process
+ 1745  sudo pkill cloud-provider-kind
+ 1746  # 2. Download the newest binary (2026 stable release)
+ 1747  curl -Lo cloud-provider-kind https://github.com/kubernetes-sigs/cloud-provider-kind/releases/latest/download/cloud-provider-kind-linux-amd64
+ 1748  cd~-
+ 1749  clear
+ 1750  cd ~-
+ 1751  ls -lrth
+ 1752  curl -Lo cloud-provider-kind https://github.com/kubernetes-sigs/cloud-provider-kind/releases/latest/download/cloud-provider-kind-linux-amd64
+ 1753  # 3. Install it
+ 1754  chmod +x cloud-provider-kind
+ 1755  sudo mv cloud-provider-kind /usr/local/bin/cloud-provider-kind
+ 1756  sudo /usr/local/bin/cloud-provider-kind   --enable-default-ingress="true"   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1757  /usr/local/bin/cloud-provider-kind   --enable-default-ingress="true"   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1758  /usr/local/bin/cloud-provider-kind 
+ 1759  cloud-provider-kind 
+ 1760  curl -Lo cloud-provider-kind https://github.com/kubernetes-sigs/cloud-provider-kind/releases/latest/download/cloud-provider-kind-linux-amd64
+ 1761  sudo mv cloud-provider-kind /usr/local/bin/cloud-provider-kind
+ 1762  curl -Lo cloud-provider-kind https://github.com/kubernetes-sigs/cloud-provider-kind/releases/latest/download/cloud-provider-kind-linux-amd64
+ 1763  chmod +x cloud-provider-kind
+ 1764  ls -lrth
+ 1765  sudo mv cloud-provider-kind /usr/local/bin/cloud-provider-kind
+ 1766  cloud-provider-kind 
+ 1767  /usr/local/bin/cloud-provider-kind 
+ 1768  make
+ 1769  ls -lrth
+ 1770  cd ../
+ 1771  ls -lrth
+ 1772  rm -rf cloud-provider-kind/
+ 1773  git clone https://github.com/kubernetes-sigs/cloud-provider-kind.git
+ 1774  Cloning into 'cloud-provider-kind'...
+ 1775  remote: Enumerating objects: 6779, done.
+ 1776  remote: Counting objects: 100% (6779/6779), done.
+ 1777  remote: Compressing objects: 100% (4225/4225), done.q
+ 1778  remote: Total 6779 (delta 2150), reused 6755 (delta 2135), pack-reused 0
+ 1779  Receiving objects: 100% (6779/6779), 9.05 MiB | 1.83 MiB/s, done.
+ 1780  Resolving deltas: 100% (2150/2150), done.
+ 1781  cd cloud-provider-kind && make
+ 1782  sudo mv ./bin/cloud-provider-kind  /usr/local/bin/cloud-provider-kind
+ 1783  make
+ 1784  ls -lrth
+ 1785  cd bin
+ 1786  cd ../
+ 1787  make
+ 1788  ls -lh bin/cloud-provider-kind
+ 1789  ./bin/cloud-provider-kind --version
+ 1790  bin/cloud-provider-kind 
+ 1791  clear
+ 1792  make
+ 1793  ./bin/cloud-provider-kind --version
+ 1794  ./bin/cloud-provider-kind 
+ 1795  ./bin/cloud-provider-kind   --enable-default-ingress="true"   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1796  clear
+ 1797  ./bin/cloud-provider-kind   --enable-default-ingress="true"   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1798  # Force kill any lingering instances
+ 1799  sudo pkill -f cloud-provider-kind
+ 1800  # Start the source-built binary
+ 1801  sudo ./bin/cloud-provider-kind   --cluster="kind"   --kubeconfig=$HOME/.kube/config   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1802  sudo ./bin/cloud-provider-kind     --kubeconfig=$HOME/.kube/config   --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1803  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1804  sudo pkill -f cloud-provider-kind
+ 1805  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1806  kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+ 1807  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+ 1808  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1809  kind delete cluster
+ 1810  sudo pkill -f cloud-provider-kind
+ 1811  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1812  sudo pkill -f cloud-provider-kind
+ 1813  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1814  kind delete cluster
+ 1815  sudo pkill -f cloud-provider-kind
+ 1816  git checkout v0.6.0
+ 1817  make build
+ 1818  kind create cluster --image kindest/node:v1.30.4
+ 1819  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"   --gateway-channel="standard"   --verbosity=3
+ 1820  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"    --verbosity=3
+ 1821  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"    -v 3
+ 1822  sudo pkill -f cloud-provider-kind
+ 1823  sudo ./bin/cloud-provider-kind      --enable-lb-port-mapping="true"    -v 3
+ 1824  cd 
+ 1825  cd ai_sre/
+ 1826  mkdir kind
+ 1827  cd kind/
+ 1828  vi kind-config.yaml
+ 1829  kind create cluster --config kind-config.yaml
+ 1830  helm upgrade --install traefik traefik/traefik   --namespace traefik --create-namespace   --set providers.kubernetesGateway.enabled=true   --set ports.web.nodePort=30080   --set service.type=NodePort
+ 1831  cd
+ 1832  clear
+ 1833  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/
+ 1834  ls -lrth
+ 1835  clear
+ 1836  cd k8s/
+ 1837  cat app-deployments.yaml 
+ 1838  clear
+ 1839  cat app-deployments.yaml 
+ 1840  :q
+ 1841  ls -lrth
+ 1842  cat dashboard-gateway-infra.yaml 
+ 1843  > dashboard-gateway-infra.yaml 
+ 1844  vi dashboard-gateway-infra.yaml 
+ 1845  kind delete cluster
+ 1846  cllear
+ 1847  clear
+ 1848  kubectl apply -f .
+ 1849  kubectl get pods -n kitchen-sre
+ 1850  curl localhost:8080
+ 1851  vi dashboard-gateway-infra.yaml 
+ 1852  cat dashboard-gateway-infra.yaml 
+ 1853  kubectl delete  -f .
+ 1854  ls -lrth
+ 1855  cat dashboard-gateway-infra.yaml 
+ 1856  > dashboard-gateway-infra.yaml 
+ 1857  vi dashboard-gateway-infra.yaml 
+ 1858  kubectl apply -f .
+ 1859  ls -lrth
+ 1860  vi dashboard-gateway-infra.yaml 
+ 1861  kubectl delete  -f .
+ 1862  kubectl apply -f .
+ 1863  vi dashboard-gateway-infra.yaml 
+ 1864  kubectl delete  -f .
+ 1865  vi dashboard-gateway-infra.yaml 
+ 1866  kubectl delete  -f .
+ 1867  kubectl apply -f .
+ 1868  vi dashboard-gateway-infra.yaml 
+ 1869  kubectl apply -f .
+ 1870  vi dashboard-gateway-infra.yaml 
+ 1871  cat dashboard-gateway-infra.yaml 
+ 1872  vi dashboard-gateway-infra.yaml 
+ 1873  kubectl delete  -f .
+ 1874  kubectl apply -f .
+ 1875  cat app-deployments.yaml 
+ 1876  clear
+ 1877  cat dashboard-gateway-infra.yaml 
+ 1878  vi  app-deployments.yaml 
+ 1879  kubectl delete  -f .
+ 1880  kubectl apply -f .
+ 1881  cat dashboard-gateway-infra.yaml 
+ 1882  vi  app-deployments.yaml 
+ 1883  vi dashboard-gateway-infra.yaml 
+ 1884  kubectl delete  -f .
+ 1885  kubectl apply -f .
+ 1886  vi dashboard-gateway-infra.yaml 
+ 1887  kubectl apply -f .
+ 1888  vi dashboard-gateway-infra.yaml 
+ 1889  kubectl apply -f .
+ 1890  vi dashboard-gateway-infra.yaml 
+ 1891  kubectl delete  -f .
+ 1892  kubectl apply -f .
+ 1893  kubectl get endpoints dashboard-ui -n kitchen-sre
+ 1894  cd 
+ 1895  kubectl get pods -n kitchen-sre
+ 1896  curl localhost:8080
+ 1897  curl localhost:8501
+ 1898  clear
+ 1899  curl localhost:8080
+ 1900  curl http://20.81.44.224:8080/
+ 1901  kubectl get pods -n kitchen-sre
+ 1902  clear
+ 1903  kubectl get pods -n kitchen-sre
+ 1904  kubectl get gatewayclass
+ 1905  kubectl describe httproute dashboard-route -n kitchen-sre
+ 1906  kubectl get pods -n kitchen-sre
+ 1907  clear
+ 1908  kubectl get pods -n kitchen-sre
+ 1909  kubectl log kitchen-dashboard-96bb79747-l28pk -n kitchen-sre
+ 1910  kubectl logs kitchen-dashboard-96bb79747-l28pk -n kitchen-sre
+ 1911  kubectl describe httproute dashboard-route -n kitchen-sre
+ 1912  kubectl get pods -n kitchen-sre
+ 1913  kubectl describe httproute dashboard-route -n kitchen-sre
+ 1914  kubectl get pods -n kitchen-sre
+ 1915  kubectl get svc -n kitchen-sre
+ 1916  kubectl describe httproute dashboard-route -n kitchen-sre
+ 1917  kubectl get gatewayclass
+ 1918  kubectl describe httproute dashboard-route -n kitchen-sre
+ 1919  kubectl get pods -a
+ 1920  kubectl get pods -A
+ 1921  kubectl logs traefik-dd8cf47d4-xcqwt -n traefik 
+ 1922  kubectl get pods -A
+ 1923  kubectl logs traefik-dd8cf47d4-xcqwt -n traefik 
+ 1924  kubectl logs traefik-dd8cf47d4-xcqwt -n traefik -f
+ 1925  ls -lrth
+ 1926  kubectl get pods -A
+ 1927  kubectl delete pod  traefik-dd8cf47d4-xcqwt -n traefik 
+ 1928  kubectl get pods -A
+ 1929  kubectl logs traefik-dd8cf47d4-x78st -n traefik -f
+ 1930  cd
+ 1931  cd ai_sre/
+ 1932  ls -lrth
+ 1933  mkdir traefik
+ 1934  cd traefik/
+ 1935  vi traefik.yaml
+ 1936  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik-values.yaml
+ 1937  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1938  > traefik.yaml 
+ 1939  vi traefik.yaml 
+ 1940  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1941  > traefik.yaml 
+ 1942  vi traefik.yaml 
+ 1943  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1944  > traefik.yaml 
+ 1945  vi traefik.yaml 
+ 1946  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1947  kubectl get gateway kitchen-gateway -n kitchen-sre
+ 1948  kubectl get gatewayclass traefik-gateway-class -o yaml
+ 1949  > traefik.yaml 
+ 1950  vi traefik.yaml 
+ 1951  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1952  > traefik.yaml 
+ 1953  vi traefik.yaml 
+ 1954  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1955  > traefik.yaml 
+ 1956  vi traefik.yaml 
+ 1957  helm upgrade traefik traefik/traefik -n traefik --create-namespace   -f traefik.yaml
+ 1958  kubectl get pods -A
+ 1959  clear
+ 1960  kubectl get svc -A
+ 1961  kubectl port-forward -n traefik svc/traefik 8888:80 --address 0.0.0.0
+ 1962  kubectl port-forward -n traefik svc/traefik 8080:80 --address 0.0.0.0
+ 1963  clear
+ 1964  kubectl port-forward -n traefik svc/traefik 8888:80 --address 0.0.0.0
+ 1965  curl -i http://localhost:8080
+ 1966  curl -i -H "Host: example-app.com" http://localhost:8888
+ 1967  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
+ 1968  kind delete cluster
+ 1969  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
+ 1970  clear
+ 1971  kind create cluster --name kitchen-cluster --image kindest/node:v1.34.0
+ 1972  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
+ 1973  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
+ 1974  helm install traefik traefik/traefik   --namespace traefik   --create-namespace
+ 1975  cd ai_sre/
+ 1976  ls -lrth
+ 1977  cd traefik/
+ 1978  ls -lrth
+ 1979  > traefik.yaml 
+ 1980  vi traefik.yaml 
+ 1981  helm install traefik traefik/traefik   --namespace traefik   --create-namespace   --version 37.3.0   -f traefik.yaml
+ 1982  vi traefik.yaml 
+ 1983  cat traefik.yaml 
+ 1984  helm install traefik traefik/traefik   --namespace traefik   --create-namespace   --version 37.3.0   -f traefik.yaml --skip-crds
+ 1985  kubectl get gatewayclass
+ 1986  kubectl port-forward -n traefik svc/traefik 8888:80 --address 0.0.0.0
+ 1987  history > history.txt
+ 1988  cat history.txt 
+ 1989  cd ../
+ 1990  git checkout v0.6.0
+ 1991  git add .; git commit -m 'working demo with port forwarding'; git push ;
+ 1992  history 
+ 1993  cd kind/
+ 1994  history > setup_history_kind_cluster_and_gateway_krd
