@@ -22,7 +22,6 @@ spec:
       namespaces:
         from: All
 ---
-# 3. The Traffic Logic (Minimalist Catch-All)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -33,10 +32,18 @@ spec:
   - name: kitchen-gateway
     namespace: kitchen-sre
     sectionName: web
+  hostnames:
+  - "ops.kitchen.local"
+  - "sentinel.prime.io"
+  - "ghost.vision.ai"
+  - "monitor.sre.local"
+  - "matrix.ops.io"
+  - "foundry.labs.dev"
+  - "signal.core.net"
   rules:
   - backendRefs:
     - name: dashboard-ui
-      port: 8501         # FIXED: This MUST match the Service port below
+      port: 8501         
 ---
 # 4. The Internal Bridge
 apiVersion: v1
@@ -47,7 +54,8 @@ metadata:
 spec:
   type: ClusterIP 
   selector:
-    app: dashboard       # Ensure your Streamlit Pod has this label!
+    app: dashboard       
   ports:
   - name: http
-    port: 8501           # The port the Route sends traffic to
+    port: 8501           
+    targetPort: 8501
