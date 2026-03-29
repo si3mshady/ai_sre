@@ -14,7 +14,7 @@ spec:
         app: agent
     spec:
       serviceAccountName: sre-agent-sa
-      runtimeClassName: gvisor  
+      #runtimeClassName: gvisor  
       containers:
       - name: agent
         imagePullPolicy: Always
@@ -65,7 +65,7 @@ spec:
         app: dashboard
     spec:
       serviceAccountName: elite-dashboard-sa
-      runtimeClassName: gvisor  
+      #runtimeClassName: gvisor  
       containers:
       - name: dashboard
         image: si3mshady/aiops:dashboard-v5
@@ -83,17 +83,17 @@ spec:
         env:
         - name: BOOTSTRAP_SERVERS
           value: "redpanda-0.redpanda.kitchen-sre.svc.cluster.local:9092"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dashboard-ui
-  namespace: kitchen-sre
-spec:
-  type: NodePort
-  selector:
-    app: dashboard
-  ports:
-  - port: 8501
-    targetPort: 8501
-    nodePort: 30501
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: dashboard-ui
+#  namespace: kitchen-sre
+#spec:
+#  type: NodePort
+#  selector:
+#    app: dashboard
+#  ports:
+#  - port: 8501
+#    targetPort: 8501
+#    nodePort: 30501

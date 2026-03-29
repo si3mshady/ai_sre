@@ -1,0 +1,53 @@
+# 1. The Handshake (Tells Traefik to handle this)
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik-gateway-class
+spec:
+  controllerName: traefik.io/gateway-controller
+---
+# 2. The Entry Point (Logical Load Balancer)
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: kitchen-gateway
+  namespace: kitchen-sre
+spec:
+  gatewayClassName: traefik-gateway-class
+  listeners:
+  - name: web
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+# 3. The Traffic Logic (Minimalist Catch-All)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dashboard-route
+  namespace: kitchen-sre
+spec:
+  parentRefs:
+  - name: kitchen-gateway
+    namespace: kitchen-sre
+    sectionName: web
+  rules:
+  - backendRefs:
+    - name: dashboard-ui
+      port: 8501         # FIXED: This MUST match the Service port below
+---
+# 4. The Internal Bridge
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-ui
+  namespace: kitchen-sre
+spec:
+  type: ClusterIP 
+  selector:
+    app: dashboard       # Ensure your Streamlit Pod has this label!
+  ports:
+  - name: http
+    port: 8501           # The port the Route sends traffic to
