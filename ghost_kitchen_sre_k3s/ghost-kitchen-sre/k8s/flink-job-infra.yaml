@@ -43,6 +43,14 @@ spec:
         - containerPort: 6123
         - containerPort: 8081
         env:
+        - name: FLINK_PROPERTIES
+          value: |
+            jobmanager.rpc.address: flink-jobmanager
+            rest.address: ghost.vision.ai
+            rest.bind-address: 0.0.0.0
+            web.checkpoints.history: 15
+            # This is the magic line for your Gateway path:
+            web.base-url: /flink  
         - name: JOB_MANAGER_RPC_ADDRESS
           value: "flink-jobmanager"
 ---
@@ -95,6 +103,23 @@ spec:
         path:
           type: ReplacePrefixMatch   # This targets just the /flink part
           replacePrefixMatch: /      # Swaps /flink for /
+    backendRefs:
+    - name: flink-jobmanager
+      port: 8081
+
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /styles.
+    - path:
+        type: PathPrefix
+        value: /runtime.
+    - path:
+        type: PathPrefix
+        value: /main.
+    - path:
+        type: PathPrefix
+        value: /polyfills.
     backendRefs:
     - name: flink-jobmanager
       port: 8081
