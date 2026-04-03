@@ -8,7 +8,10 @@ SERVICE_PORT="${SERVICE_PORT:-80}"
 echo "=== Deploying Kata Test Pod ==="
 
 # Use the first available kata runtime class
+#RUNTIME_CLASS="kata-qemu"
+
 RUNTIME_CLASS=$(kubectl get runtimeclass | grep '^kata-' | head -n1 | awk '{print $1}')
+
 if [[ -z "$RUNTIME_CLASS" ]]; then
   echo "No kata runtime class found. Available classes:"
   kubectl get runtimeclass
