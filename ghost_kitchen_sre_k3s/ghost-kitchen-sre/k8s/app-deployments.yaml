@@ -14,7 +14,7 @@ spec:
         app: agent
     spec:
       serviceAccountName: sre-agent-sa
-      #runtimeClassName: gvisor  
+      runtimeClassName: kata-clh  
       containers:
       - name: agent
         imagePullPolicy: Always
@@ -65,7 +65,7 @@ spec:
         app: dashboard
     spec:
       serviceAccountName: elite-dashboard-sa
-      #runtimeClassName: gvisor  
+      runtimeClassName: kata-clh  
       containers:
       - name: dashboard
         image: si3mshady/aiops:dashboard-v5
