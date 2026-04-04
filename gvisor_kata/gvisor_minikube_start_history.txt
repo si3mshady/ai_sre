@@ -1,0 +1,1000 @@
+  981  # 3. Reinstall k3s with the same version you want
+  982  curl -sfL https://get.k3s.io |   INSTALL_K3S_VERSION="v1.34.6+k3s1"   INSTALL_K3S_EXEC="--disable=traefik"   sh -
+  983  # 4. Fix kubectl config for this new cluster
+  984  mkdir -p ~/.kube
+  985  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+  986  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+  987  chmod 600 ~/.kube/k3s.yaml
+  988  export KUBECONFIG=~/.kube/k3s.yaml
+  989  # 5. Wait for node Ready and check CNI
+  990  kubectl wait --for=condition=Ready node --all --timeout=180s
+  991  kubectl get pods -n kube-system -o wide | grep -E "(cni|flannel|cilium|kube-router)"
+  992  kind delete cluster
+  993  kind get clusters
+  994  kind delete cluster --name kitchen-cluster
+  995  kubectl get pods 
+  996  kind get nodes
+  997  kubectl get nodes
+  998  clear
+  999  curl -sfL https://get.k3s.io | sh -
+ 1000  sudo k3s kubectl config view --raw > ~/.kube/config
+ 1001  chmod 600 ~/.kube/config
+ 1002  kubectl get nodes
+ 1003  # You should see 1 node.
+ 1004  # Download and install runsc
+ 1005  (   set -e;   ARCH=$(uname -m);   URL=https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH};   wget ${URL}/runsc ${URL}/runsc.sha512     ${URL}/containerd-shim-runsc-v1 ${URL}/containerd-shim-runsc-v1.sha512;   sha512sum -c runsc.sha512 -c containerd-shim-runsc-v1.sha512;   rm -f *.sha512;   chmod a+rx runsc containerd-shim-runsc-v1;   sudo mv runsc containerd-shim-runsc-v1 /usr/local/bin; )
+ 1006  # Install gVisor (patches containerd)
+ 1007  sudo runsc install
+ 1008  sudo systemctl restart containerd
+ 1009  sudo ctr run --runtime io.containerd.runsc.v1 -t --rm docker.io/library/busybox:latest test-dmesg dmesg
+ 1010  sudo ctr image pull docker.io/library/busybox:latest
+ 1011  sudo ctr run --runtime io.containerd.runsc.v1 -t --rm docker.io/library/busybox:latest test-dmesg dmesg
+ 1012  sudo tee /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl > /dev/null <<'TOML'
+ 1013  version = 2
+ 1014  [plugins."io.containerd.grpc.v1.cri".containerd]
+ 1015    default_runtime_name = "runc"
+ 1016    # Standard runc runtime
+ 1017    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+ 1018      runtime_type = "io.containerd.runc.v2"
+ 1019      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+ 1020        SystemdCgroup = true
+ 1021    # gVisor runtime (runsc)
+ 1022    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+ 1023      runtime_type = "io.containerd.runsc.v1"
+ 1024  TOML
+ 1025  sudo systemctl restart k3s
+ 1026  kubectl get node
+ 1027  sudo systemctl restart containerd
+ 1028  sudo systemctl restart k3s
+ 1029  kubectl get node
+ 1030  # 1) Stop k3s cleanly
+ 1031  sudo systemctl stop k3s
+ 1032  # 2) Remove k3s state (this is safe on dev)
+ 1033  sudo /usr/local/bin/k3s-uninstall.sh
+ 1034  # 3) Ensure k3s binary is gone
+ 1035  sudo rm -f /usr/local/bin/k3s
+ 1036  # 4) Re‑install k3s
+ 1037  curl -sfL https://get.k3s.io | sh -
+ 1038  kubectl get nodes
+ 1039  # 1) Stop k3s cleanly
+ 1040  sudo systemctl stop k3s
+ 1041  # 2) Remove k3s state (this is safe on dev)
+ 1042  sudo /usr/local/bin/k3s-uninstall.sh
+ 1043  # 3) Ensure k3s binary is gone
+ 1044  sudo rm -f /usr/local/bin/k3s
+ 1045  # 4) Re‑install k3s
+ 1046  curl -sfL https://get.k3s.io | sh -
+ 1047  kubectl get nodes
+ 1048  history | grep 600
+ 1049  chmod 600 ~/.kube/config
+ 1050  kubectl get nodes
+ 1051  clear
+ 1052  kubectl get nodes
+ 1053  sudo k3s-uninstall.sh
+ 1054  clear
+ 1055  vi gvisor_test.sh
+ 1056  bash gvisor_test.sh 
+ 1057  sudo /usr/local/bin/k3s-uninstall.sh 
+ 1058  ls -lrth
+ 1059  > gvisor_test.sh 
+ 1060  vi gvisor_test.sh 
+ 1061  bash gvisor_test.sh 
+ 1062  sudo /usr/local/bin/k3s-uninstall.sh 
+ 1063  > gvisor_test.sh 
+ 1064  vi gvisor_test.sh 
+ 1065  bash gvisor_test.sh 
+ 1066  kubectl get pods
+ 1067  sudo /usr/local/bin/k3s-uninstall.sh 
+ 1068  vi gvisor_test.sh 
+ 1069  > gvisor_test.sh 
+ 1070  vi gvisor_test.sh 
+ 1071  bash gvisor_test.sh 
+ 1072  kubectl get pods
+ 1073  # 1. Re‑copy the fresh k3s config
+ 1074  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1075  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1076  chmod 600 ~/.kube/k3s.yaml
+ 1077  export KUBECONFIG=~/.kube/k3s.yaml
+ 1078  # 2. Test again
+ 1079  kubectl cluster-info
+ 1080  kubectl get nodes
+ 1081  kubectl get pods
+ 1082  kubectl describe pod demo-sandbox-pod 
+ 1083  sudo /usr/local/bin/k3s-uninstall.sh 
+ 1084  > gvisor_test.sh 
+ 1085  vi gvisor_test.sh 
+ 1086  bash gvisor_test.sh 
+ 1087  kubectl describe pod demo-sandbox-pod 
+ 1088  kubectl get pods
+ 1089  kubectl describe pod demo-sandbox-pod 
+ 1090  # 1. Stop k3s and wipe its state
+ 1091  sudo systemctl stop k3s
+ 1092  sudo k3s-uninstall.sh || true
+ 1093  sudo rm -rf /var/lib/rancher/k3s
+ 1094  sudo rm -f /etc/containerd/config.toml*
+ 1095  # 2. Reinstall k3s (latest, no extra flags)
+ 1096  curl -sfL https://get.k3s.io | sh -
+ 1097  # 3. Fix kubectl config for this new cluster
+ 1098  mkdir -p ~/.kube
+ 1099  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1100  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1101  chmod 600 ~/.kube/k3s.yaml
+ 1102  export KUBECONFIG=~/.kube/k3s.yaml
+ 1103  # 4. Wait for node Ready and check CNI
+ 1104  kubectl wait --for=condition=Ready node --all --timeout=180s
+ 1105  kubectl get pods -n kube-system -o wide | grep -E "(cni|flannel|cilium|kube-router|calico)"
+ 1106  # 1. Stop k3s and fully wipe its state
+ 1107  sudo systemctl stop k3s
+ 1108  sudo k3s-uninstall.sh || true
+ 1109  sudo rm -rf /var/lib/rancher/k3s
+ 1110  # 2. Remove any stray containerd config that might interfere
+ 1111  sudo rm -f /etc/containerd/config.toml*
+ 1112  # 3. Reinstall k3s with the same version you want
+ 1113  curl -sfL https://get.k3s.io |   INSTALL_K3S_VERSION="v1.34.6+k3s1"   INSTALL_K3S_EXEC="--disable=traefik"   sh -
+ 1114  # 4. Fix kubectl config for this new cluster
+ 1115  mkdir -p ~/.kube
+ 1116  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1117  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1118  chmod 600 ~/.kube/k3s.yaml
+ 1119  export KUBECONFIG=~/.kube/k3s.yaml
+ 1120  # 5. Wait for node Ready and check CNI
+ 1121  kubectl wait --for=condition=Ready node --all --timeout=180s
+ 1122  kubectl get pods -n kube-system -o wide | grep -E "(cni|flannel|cilium|kube-router)"
+ 1123  sudo k3s-uninstall.sh || true
+ 1124  ls -lrth\
+ 1125  ls -lrth
+ 1126  cd
+ 1127  ls -lrth
+ 1128  vi gvisor_2.sh
+ 1129  bash gvisor_2.sh 
+ 1130  # 1. Check if any CNI pod is running in kube-system
+ 1131  kubectl get pods -n kube-system -o wide | grep -E "(cni|flannel|cilium|kube-router|calico)"
+ 1132  # Copy fresh k3s kubeconfig
+ 1133  sudo mkdir -p ~/.kube
+ 1134  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1135  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1136  chmod 600 ~/.kube/k3s.yaml
+ 1137  # Use that config
+ 1138  export KUBECONFIG=~/.kube/k3s.yaml
+ 1139  # Test
+ 1140  kubectl cluster-info
+ 1141  kubectl get pods -n kube-system -o wide | grep -E "(cni|flannel|cilium|kube-router|calico)"
+ 1142  kubectl get nodes
+ 1143  kubectl get pods -n kube-system -o wide
+ 1144  sudo journalctl -u k3s --no-pager -n 100
+ 1145  # 1. Stop and fully wipe k3s
+ 1146  sudo systemctl stop k3s
+ 1147  sudo k3s-uninstall.sh || true
+ 1148  sudo rm -rf /var/lib/rancher/k3s
+ 1149  sudo rm -f /etc/containerd/config.toml*
+ 1150  sudo rm -rf ~/.kube
+ 1151  # 2. Reinstall k3s from scratch
+ 1152  curl -sfL https://get.k3s.io | sh -
+ 1153  # 3. Fix kubectl for this new cluster
+ 1154  mkdir -p ~/.kube
+ 1155  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1156  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1157  chmod 600 ~/.kube/k3s.yaml
+ 1158  export KUBECONFIG=~/.kube/k3s.yaml
+ 1159  # 4. Watch what actually comes up
+ 1160  kubectl get pods -n kube-system -o wide --watch
+ 1161  # 1. Stop k3s and clean state
+ 1162  sudo systemctl stop k3s
+ 1163  sudo k3s-uninstall.sh || true
+ 1164  sudo rm -rf /var/lib/rancher/k3s
+ 1165  sudo rm -f /etc/containerd/config.toml*
+ 1166  sudo rm -rf ~/.kube/
+ 1167  # 2. Reinstall k3s with Flannel explicitly forced (default but explicit)
+ 1168  curl -sfL https://get.k3s.io |   INSTALL_K3S_EXEC="server --flannel-backend=vxlan"   sh -
+ 1169  # 3. Fix kubectl config for this new cluster
+ 1170  mkdir -p ~/.kube
+ 1171  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1172  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1173  chmod 600 ~/.kube/k3s.yaml
+ 1174  export KUBECONFIG=~/.kube/k3s.yaml
+ 1175  # 4. Watch for Flannel pod and network readiness
+ 1176  kubectl wait --for=condition=Ready node --all --timeout=180s
+ 1177  kubectl get pods -n kube-system -o wide | grep -E "(kube-flannel|flannel|cni)"
+ 1178  cd
+ 1179  ls -lrth
+ 1180  bash gvisor_2.sh 
+ 1181  claer
+ 1182  clear
+ 1183  kubectl wait --for=condition=Ready node --all --timeout=180s
+ 1184  kubectl get pods -n kube-system -o wide | grep -E "(kube-flannel|flannel|cni)"
+ 1185  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1186  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1187  chmod 600 ~/.kube/k3s.yaml
+ 1188  export KUBECONFIG=~/.kube/k3s.yaml
+ 1189  kubectl get pods -n kube-system -o wide | grep -E "(kube-flannel|flannel|cni)"
+ 1190  kubectl get pods -n kube-system -o wide 
+ 1191  kubectl get crd
+ 1192  kubectl wait --for=condition=Ready node --all --timeout=180s
+ 1193  clear
+ 1194  kubectl get pods -n kube-system -o wide | grep -E "(kube-flannel|flannel|cni)"
+ 1195  mkdir -p ~/.kube
+ 1196  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1197  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1198  chmod 600 ~/.kube/k3s.yaml
+ 1199  export KUBECONFIG=~/.kube/k3s.yaml
+ 1200  kubectl get pods -n kube-system -o wide | grep -E "(kube-flannel|flannel|cni)"
+ 1201  kubectl get pods 
+ 1202  sudo systemctl stop k3s
+ 1203  sudo k3s-uninstall.sh || true
+ 1204  sudo rm -rf /var/lib/rancher/k3s
+ 1205  sudo rm -f /etc/containerd/config.toml*
+ 1206  sudo rm -rf ~/.kube/
+ 1207  curl -sfL https://get.k3s.io | sh -
+ 1208  mkdir -p ~/.kube
+ 1209  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1210  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1211  chmod 600 ~/.kube/k3s.yaml
+ 1212  export KUBECONFIG=~/.kube/k3s.yaml
+ 1213  journalctl -u k3s --no-pager -n 100
+ 1214  kubectl get nodes -o wide
+ 1215  kubectl get pods -n kube-system -o wide
+ 1216  sudo journalctl -u k3s --no-pager -n 100 | grep -i -B2 -A2 "cni\|flannel\|calico\|NetworkNotReady"
+ 1217  kubectl run testpod --image=busybox:1.36 --restart=Never -- sleep 3600
+ 1218  kubectl wait --for=condition=Ready pod/testpod --timeout=60s
+ 1219  kubectl get pod testpod -o wide
+ 1220  kubectl exec testpod -- ping -c 3 10.42.0.6   # ping another pod IP
+ 1221  kubectl get nodes
+ 1222  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1223  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1224  chmod 600 ~/.kube/k3s.yaml
+ 1225  export KUBECONFIG=~/.kube/k3s.yaml
+ 1226  kubectl get nodes
+ 1227  # 1. Install gVisor binaries (runsc + containerd‑shim)
+ 1228  (   set -e;   cd /tmp;    GVISOR_URL="https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)";   wget "${GVISOR_URL}/runsc" "${GVISOR_URL}/runsc.sha512";   wget "${GVISOR_URL}/containerd-shim-runsc-v1" "${GVISOR_URL}/containerd-shim-runsc-v1.sha512";    sha512sum -c runsc.sha512;   sha512sum -c containerd-shim-runsc-v1.sha512;    chmod a+rx runsc containerd-shim-runsc-v1;    sudo mv runsc containerd-shim-runsc-v1 /usr/local/bin/; )
+ 1229  # 2. Tell k3s’s containerd about runsc (via template)
+ 1230  sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
+ 1231  sudo tee /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl > /dev/null << 'EOF'
+ 1232  version = 2
+ 1233  [plugins."io.containerd.grpc.v1.cri".containerd]
+ 1234    default_runtime_name = "runc"
+ 1235  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+ 1236    runtime_type = "io.containerd.runc.v2"
+ 1237  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+ 1238    runtime_type = "io.containerd.runsc.v1"
+ 1239  EOF
+ 1240  # 3. Restart k3s so it picks up the new runtime
+ 1241  sudo systemctl restart k3s
+ 1242  # 4. Create the RuntimeClass: gvisor
+ 1243  kubectl apply -f - > /dev/null << 'EOF'
+ 1244  apiVersion: node.k8s.io/v1
+ 1245  kind: RuntimeClass
+ 1246  metadata:
+ 1247    name: gvisor
+ 1248  handler: runsc
+ 1249  EOF
+ 1250  kubectl apply -f - > /dev/null << 'EOF'
+ 1251  apiVersion: node.k8s.io/v1
+ 1252  kind: RuntimeClass
+ 1253  metadata:
+ 1254    name: gvisor
+ 1255  handler: runsc
+ 1256  EOF
+ 1257  clear
+ 1258  mkdir -p ~/.kube
+ 1259  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1260  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1261  chmod 600 ~/.kube/k3s.yaml
+ 1262  export KUBECONFIG=~/.kube/k3s.yaml
+ 1263  kubectl cluster-info
+ 1264  cd /tmp
+ 1265  (   set -e;    GVISOR_URL="https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)";    wget "${GVISOR_URL}/runsc";   wget "${GVISOR_URL}/runsc.sha512";   wget "${GVISOR_URL}/containerd-shim-runsc-v1";   wget "${GVISOR_URL}/containerd-shim-runsc-v1.sha512";    sha512sum -c runsc.sha512;   sha512sum -c containerd-shim-runsc-v1.sha512;    chmod a+rx runsc containerd-shim-runsc-v1;    sudo mkdir -p /usr/local/bin;   sudo mv runsc containerd-shim-runsc-v1 /usr/local/bin/; )
+ 1266  sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
+ 1267  sudo tee /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl > /dev/null << 'EOF'
+ 1268  version = 2
+ 1269  [plugins."io.containerd.grpc.v1.cri".containerd]
+ 1270    default_runtime_name = "runc"
+ 1271  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+ 1272    runtime_type = "io.containerd.runc.v2"
+ 1273  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+ 1274    runtime_type = "io.containerd.runsc.v1"
+ 1275  EOF
+ 1276  sudo systemctl restart k3s
+ 1277  sleep 5
+ 1278  kubectl get nodes
+ 1279  # 1. Stop k3s and wipe its state completely
+ 1280  sudo systemctl stop k3s
+ 1281  sudo k3s-uninstall.sh || true
+ 1282  sudo rm -rf /var/lib/rancher/k3s
+ 1283  sudo rm -f /etc/containerd/config.toml*
+ 1284  # 2. Reinstall k3s cleanly (no extra flags)
+ 1285  curl -sfL https://get.k3s.io | sh -
+ 1286  # 3. Fix kubectl config immediately
+ 1287  mkdir -p ~/.kube
+ 1288  sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml
+ 1289  sudo chown "$USER":"$USER" ~/.kube/k3s.yaml
+ 1290  chmod 600 ~/.kube/k3s.yaml
+ 1291  export KUBECONFIG=~/.kube/k3s.yaml
+ 1292  # 4. Wait for node Ready (this time it should actually happen)
+ 1293  kubectl wait --for=condition=Ready node --all --timeout=180s
+ 1294  kubectl get nodes -o wide
+ 1295  kubectl get pods -n kube-system -o wide
+ 1296  # 5. Install runsc + tell containerd
+ 1297  cd /tmp
+ 1298  (   set -e;    GVISOR_URL="https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)";   wget "${GVISOR_URL}/runsc";   wget "${GVISOR_URL}/runsc.sha512";   wget "${GVISOR_URL}/containerd-shim-runsc-v1";   wget "${GVISOR_URL}/containerd-shim-runsc-v1.sha512";    sha512sum -c runsc.sha512;   sha512sum -c containerd-shim-runsc-v1.sha512;    chmod a+rx runsc containerd-shim-runsc-v1;    sudo mkdir -p /usr/local/bin;   sudo mv runsc containerd-shim-runsc-v1 /usr/local/bin/; )
+ 1299  sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
+ 1300  sudo tee /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl > /dev/null << 'EOF'
+ 1301  version = 2
+ 1302  [plugins."io.containerd.grpc.v1.cri".containerd]
+ 1303    default_runtime_name = "runc"
+ 1304  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+ 1305    runtime_type = "io.containerd.runc.v2"
+ 1306  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+ 1307    runtime_type = "io.containerd.runsc.v1"
+ 1308  EOF
+ 1309  sudo systemctl restart k3s
+ 1310  sleep 5
+ 1311  # 6. Create RuntimeClass (this time with a working node)
+ 1312  kubectl apply --validate=false -f - << 'EOF'
+ 1313  apiVersion: node.k8s.io/v1
+ 1314  kind: RuntimeClass
+ 1315  metadata:
+ 1316    name: gvisor
+ 1317  handler: runsc
+ 1318  EOF
+ 1319  kubectl get runtimeclass gvisor
+ 1320  kubectl delete pod demo-sandbox-pod --ignore-not-found
+ 1321  kubectl delete service demo-sandbox --ignore-not-found
+ 1322  kubectl apply -f - << 'EOF'
+ 1323  apiVersion: v1
+ 1324  kind: Pod
+ 1325  metadata:
+ 1326    name: demo-sandbox-pod
+ 1327    labels:
+ 1328      app: demo-sandbox
+ 1329  spec:
+ 1330    runtimeClassName: gvisor
+ 1331    containers:
+ 1332    - name: http-server
+ 1333      image: busybox:1.36
+ 1334      command: ["/usr/bin/httpd"]
+ 1335      args: ["-f", "-p", "8080"]
+ 1336      ports:
+ 1337      - containerPort: 8080
+ 1338  ---
+ 1339  apiVersion: v1
+ 1340  kind: Service
+ 1341  metadata:
+ 1342    name: demo-sandbox
+ 1343  spec:
+ 1344    selector:
+ 1345      app: demo-sandbox
+ 1346    ports:
+ 1347    - port: 80
+ 1348      targetPort: 8080
+ 1349  EOF
+ 1350  kubectl wait --for=condition=Ready pod/demo-sandbox-pod --timeout=120s
+ 1351  kubectl port-forward service/demo-sandbox 888:80
+ 1352  cd 
+ 1353  cd ai_sre/
+ 1354  mkdir gvisor_kata
+ 1355  cd gvisor_kata/
+ 1356  vi gvisor.sh
+ 1357  bash gvisor.sh 
+ 1358  curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+ 1359  sudo install minikube-linux-amd64 /usr/local/bin/minikube
+ 1360  bash gvisor.sh 
+ 1361  > gvisor.sh 
+ 1362  vi gvisor.sh 
+ 1363  bash gvisor.sh 
+ 1364  vi kata.sh
+ 1365  bash kata.sh 
+ 1366  > kata.sh 
+ 1367  vi kata.sh 
+ 1368  bash kata.sh 
+ 1369  vi kata.sh 
+ 1370  bash kata.sh 
+ 1371  > kata.sh 
+ 1372  vi kata.sh 
+ 1373  bash kata.sh 
+ 1374  > kata.sh 
+ 1375  vi kata.sh 
+ 1376  bash kata.sh 
+ 1377  > kata.sh 
+ 1378  vi kata.sh 
+ 1379  bash kata.sh 
+ 1380  > kata.sh 
+ 1381  vi kata.sh 
+ 1382  bash kata.sh 
+ 1383  > kata.sh 
+ 1384  vi kata.sh 
+ 1385  bash kata.sh 
+ 1386  > kata.sh 
+ 1387  vi kata.sh 
+ 1388  bash kata.sh 
+ 1389  > kata.sh 
+ 1390  vi kata.sh 
+ 1391  bash kata.sh 
+ 1392  > kata.sh 
+ 1393  vi kata.sh 
+ 1394  bash kata.sh 
+ 1395  > kata.sh 
+ 1396  vi kata.sh 
+ 1397  bash kata.sh 
+ 1398  > kata.sh 
+ 1399  vi kata.sh 
+ 1400  bash kata.sh 
+ 1401  kubectl apply -f - <<EOF
+ 1402  apiVersion: v1
+ 1403  kind: Pod
+ 1404  metadata:
+ 1405    name: test-agent-kata
+ 1406    labels:
+ 1407      app: test-agent-kata
+ 1408  spec:
+ 1409    runtimeClassName: kata-qemu  # Use specific handler (most stable)
+ 1410    containers:
+ 1411    - name: app
+ 1412      image: nginx:alpine
+ 1413      ports:
+ 1414      - containerPort: 80
+ 1415      command: ["/bin/sh", "-c"]
+ 1416      args:
+ 1417      - |
+ 1418        echo 'Serving JSON...' &&
+ 1419        nc -l -p 80 -e 'echo -e "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"pod\": \"test-agent-kata\", \"runtime_class\": \"kata-qemu\", \"handler\": \"kata-qemu\", \"deployed_by\": \"helm-chart\"}"'
+ 1420  EOF
+ 1421  kubectl expose pod test-agent-kata --type=NodePort --port=80
+ 1422  kubectl wait --for=condition=ready pod/test-agent-kata --timeout=120s
+ 1423  IP=$(minikube ip --profile=kata-cluster)
+ 1424  PORT=$(kubectl get svc test-agent-kata -o jsonpath='{.spec.ports[0].nodePort}')
+ 1425  echo "curl http://${IP}:${PORT}/"
+ 1426  ls -lrth
+ 1427  IP=$(minikube ip --profile=kata-cluster)
+ 1428  PORT=$(kubectl get svc test-agent-kata -o jsonpath='{.spec.ports[0].nodePort}')
+ 1429  echo "curl http://${IP}:${PORT}/"
+ 1430  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName
+ 1431  kubectl describe pod test-agent-kata | grep Runtime
+ 1432  kubectl describe pod test-agent-kata | grep Runtime | jq
+ 1433  clear
+ 1434  apt install jq
+ 1435  sudp apt install jq
+ 1436  sudo apt install jq
+ 1437  clear
+ 1438  kubectl describe pod test-agent-kata | grep Runtime | jq
+ 1439  kubectl describe pod test-agent-kata | grep Runtime 
+ 1440  clear
+ 1441  kubectl describe pod test-agent-kata | grep Runtime 
+ 1442  clear
+ 1443  kubectl describe pod test-agent-kata | grep Runtime 
+ 1444  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName
+ 1445  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName | jq
+ 1446  ls -lrth
+ 1447  clear
+ 1448  cd
+ 1449  claer
+ 1450  clear
+ 1451  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName | jq
+ 1452  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName 
+ 1453  clear
+ 1454  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName | jq
+ 1455  clear
+ 1456  kubectl get pod test-agent-kata -o yaml | grep runtimeClassName 
+ 1457  # Check what's actually deployed
+ 1458  kubectl -n kube-system get all | grep -i kata
+ 1459  kubectl -n kube-system get jobs | grep -i kata
+ 1460  kubectl -n kube-system get daemonset | grep -i kata
+ 1461  kubectl get runtimeclass | grep kata
+ 1462  # Check Helm release status
+ 1463  helm -n kube-system status kata-deploy
+ 1464  # Check kata-deploy logs (if pods exist)
+ 1465  kubectl -n kube-system logs -l app.kubernetes.io/name=kata-deploy --tail=50
+ 1466  cd
+ 1467  kubectl
+ 1468  kubectl get nodes
+ 1469  clear
+ 1470  cd ai_sre/
+ 1471  ls -lrth
+ 1472  cd gvisor_kata/
+ 1473  ls
+ 1474  > kata.sh 
+ 1475  vi kata.sh 
+ 1476  bash kata.sh 
+ 1477  kubectl get runtimeclass | grep kata
+ 1478  ls -lrth
+ 1479  vi kata.sh 
+ 1480  clear
+ 1481  bash kata.sh 
+ 1482  > kata.sh 
+ 1483  vi kata.sh
+ 1484  bash kata.sh 
+ 1485  vi kata.sh
+ 1486  bash kata.sh 
+ 1487  vi kata.sh
+ 1488  cat kata.sh 
+ 1489  vi deploy_kata_test_pod.sh
+ 1490  bash deploy_kata_test_pod.sh 
+ 1491  kubectl get runtimeclass
+ 1492  >  deploy_kata_test_pod.sh
+ 1493  vi deploy_kata_test_pod.sh
+ 1494  bash deploy_kata_test_pod.sh 
+ 1495  curl http://192.168.49.2:32483/
+ 1496  cd ../
+ 1497  git add .; git commit -m 'gateway api min is working'; git push;
+ 1498  git add .; git commit -m 'added kata container example'; git push;
+ 1499  ls -lrth
+ 1500  cd gvisor_kata/
+ 1501  ls -lrth
+ 1502  rm -rf kata-containers/
+ 1503  cd ../
+ 1504  git add .; git commit -m 'added kata container example'; git push;
+ 1505  git status
+ 1506  git rm --cached gvisor_kata/minikube-linux-amd64
+ 1507  git commit --amend
+ 1508  git push --force
+ 1509  ls -lrth
+ 1510  touch .gitignore
+ 1511  vi .gitignore 
+ 1512  git add .; git commit -m 'added kata container example'; git push;
+ 1513  mv gvisor_kata/minikube-linux-amd64 ~
+ 1514  git add .; git commit -m 'added kata container example'; git push;
+ 1515  ls -lrth gvisor_kata/
+ 1516  pip install git-filter-repo
+ 1517  git filter-repo --path gvisor_kata/minikube-linux-amd64 --invert-paths
+ 1518  git push origin agentic-rag --force
+ 1519  pip3 install git-filter-repo
+ 1520  sudo apt install python3-pip
+ 1521  pip install git-filter-repo
+ 1522  git add .; git commit -m 'added kata container example'; git push;
+ 1523  [200~pip install git-filter-repo
+ 1524  git filter-repo --path gvisor_kata/minikube-linux-amd64 --invert-paths
+ 1525  sudo pip install git-filter-repo
+ 1526  sudo pip install git-filter-repo --break-system-packages
+ 1527  git filter-repo --path gvisor_kata/minikube-linux-amd64 --invert-paths
+ 1528  git filter-repo --path gvisor_kata/minikube-linux-amd64 --invert-paths --force
+ 1529  git push origin agentic-rag --force
+ 1530  git add .; git commit -m 'added kata container example'; git push;
+ 1531  history | grep git
+ 1532  history | grep commit 
+ 1533  git add .; git commit -m 'added kata container example'; git push;
+ 1534  history | grep remote
+ 1535  ls -lrth | grep ~/github_docker_tokens.token 
+ 1536  kubectl get pods -A
+ 1537  clear
+ 1538  kubectl get pods -A
+ 1539  kubctl describe pod test-kata-pod 
+ 1540  kubectl describe pod test-kata-pod 
+ 1541  kubeectl get runtimeClass
+ 1542  kubectl get runtimeClass
+ 1543  clear
+ 1544  kubectl -n kube-system get all | grep kata
+ 1545  helm -n kube-system status kata-deploy
+ 1546  kubectl get runtimeclass
+ 1547  helm -n kube-system status kata-deploy
+ 1548  kubectl get runtimeclass
+ 1549  kubectl -n kube-system get all | grep -i kata
+ 1550  kubectl get pods  -A
+ 1551  kubectl get runtimeclass | grep kata || echo "RuntimeClass not found - checking logs...
+ 1552  kubectl get runtimeclass | grep kata || echo "RuntimeClass not found - checking logs..."
+ 1553  kubectl get pods  -A
+ 1554  kubectl describe pod test-agent-kata
+ 1555  kubectl describe pod test-agent-kata | grep -i runtimeclasss
+ 1556  kubectl describe pod test-agent-kata | grep -i runtimeclass
+ 1557  kubectl describe pod test-agent-kata | grep -i runtime
+ 1558  clear
+ 1559  kubectl exec -it test-agent-kata -- uname -a
+ 1560  kubectl exec -it test-agent-kata -- sh -c "
+ 1561  echo 'Testing isolation...' &&
+ 1562  cat /etc/shadow > /dev/null 2>&1 && echo 'Host shadow accessible!' || echo '✓ 
+ 1563  clear
+ 1564  # Test malicious escape attempt (safe demo)
+ 1565  kubectl exec -it test-agent-kata -- sh -c "
+ 1566  echo 'Testing isolation...' &&
+ 1567  cat /etc/shadow > /dev/null 2>&1 && echo 'Host shadow accessible!' || echo '✓ Blocked: No host access' &&
+ 1568  ls /proc/1/root/etc/shadow > /dev/null 2>&1 && echo 'Host rootfs readable!' || echo '✓ Blocked: Isolated filesystem' &&
+ 1569  mount | grep -q '/host' && echo 'Host mounts visible!' || echo '✓ No host mounts'
+ 1570  "
+ 1571  cd 
+ 1572  cd ai_sre/
+ 1573  ls -lrth
+ 1574  cd gvisor_kata/
+ 1575  ls -lrth
+ 1576  vi deploy_kata_test_pod.sh 
+ 1577  bash deploy_kata_test_pod.sh 
+ 1578  kubectl get pods -A
+ 1579  kubectl get deploy -A
+ 1580  kubectl get pods -A
+ 1581  kubectl delete  pod test-agent-kata
+ 1582  bash deploy_kata_test_pod.sh 
+ 1583  kubectl get pods -A
+ 1584  kubectl delete  pod test-agent-kata
+ 1585  bash deploy_kata_test_pod.sh 
+ 1586  cd
+ 1587  ls -lrth
+ 1588  cd ai_sre/
+ 1589  clear
+ 1590  clear 
+ 1591  ls -lrth
+ 1592  clear
+ 1593  kubectl get runtimeClass
+ 1594  kubectl get pods 
+ 1595  kubectl get pods | grep -i runtimeclass
+ 1596  kubectl get pods -o yaml | grep -i runtimeclass
+ 1597  clear
+ 1598  kubectl get runtimeClass
+ 1599  kubectl get pods -o yaml | grep -i runtimeclass
+ 1600  cd 
+ 1601  clear
+ 1602  ls -lrth
+ 1603  cd ai_sre/
+ 1604  ls -lrth
+ 1605  cd gvisor_kata/
+ 1606  ls -lrth
+ 1607  bash kata.sh 
+ 1608  kubectl get pods
+ 1609  kubectl get pods -w
+ 1610  kubectl get pods
+ 1611  kubectl describe  pod test-agent-kata
+ 1612  ls -lrth
+ 1613  vi kata.sh 
+ 1614  vi deploy_kata_test_pod.sh 
+ 1615  kubectl delete  pod test-agent-kata
+ 1616  bash deploy_kata_test_pod.sh 
+ 1617  kubectl exec test-agent-kata -- sh -c '[ $(awk "{print \$1}" /proc/uptime | cut -d. -f1) -lt 3600 ] && echo "PASS: Isolated Uptime" |
+ 1618  | echo "FAIL: Host Uptime Leak"'
+ 1619  kubectl exec test-agent-kata -- sh -c 'if [ $(cut -d. -f1 /proc/uptime) -lt 7200 ]; then echo PASS; else echo FAIL; fi'
+ 1620  kubect get runtimeclass
+ 1621  kubect get runtimeClass
+ 1622  kubectl get runtimeClass
+ 1623  clear
+ 1624  kubectl get runtimeClass
+ 1625  kubectl get pod 
+ 1626  kubectl get pod test-agent-kata -o yaml
+ 1627  kubectl get pod test-agent-kata -o yaml | grep -i runtimeclass
+ 1628  clear
+ 1629  kubectl get pod 
+ 1630  kubectl get runtimeClass
+ 1631  clear
+ 1632  kubectl get runtimeClass
+ 1633  kubectl get pod test-agent-kata -o yaml | grep -i runtimeclass
+ 1634  clear
+ 1635  kubectl get pod test-agent-kata -o yaml | grep -i runtimeclass
+ 1636  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1637  clear
+ 1638  kubectl get runtimeClass
+ 1639  clear
+ 1640  kubectl get pods
+ 1641  kubectl get pod test-agent-kata -o yaml | grep -i runtimeclass
+ 1642  cd
+ 1643  clear
+ 1644  ls -lrth
+ 1645  cd ai_sre/
+ 1646  ls -lrth
+ 1647  cd gvisor_kata/
+ 1648  ls -lrth
+ 1649  bash deploy_kata_test_pod.sh 
+ 1650  clear
+ 1651  ls -lrth
+ 1652  kubectl exec test-agent-kata -- bash
+ 1653  kubectl exec test-agent-kata -- sh
+ 1654  kubectl exec test-agent-kata -- kata
+ 1655  kubectl exec test-agent-kata -- ls
+ 1656  kubectl exec test-agent-kata -- clear
+ 1657  kubectl exec test-agent-kata -- [ "$(uname -r | grep -iE 'kata|mshv|virt')" ] && echo "PASS: Guest Kernel Detected" | | echo "FAIL: Host Kernel Shared"
+ 1658  kubectl exec test-agent-kata -- [ "$(uname -r | grep -iE 'kata|mshv|virt')" ] && echo "PASS: Guest Kernel Detected"\ | | echo "FAIL: Host Kernel Shared"
+ 1659  kubectl exec test-agent-kata -- sh -c '[ $(awk "{print \$1}" /proc/uptime | cut -d. -f1) -lt 3600 ] && echo "PASS: Isolated Uptime" |
+ 1660  | echo "FAIL: Host Uptime Leak"'
+ 1661  kubectl exec test-agent-kata -- sh -c 'uname -r | grep -iE "kata|mshv|virt" && echo "PASS: Guest Kernel Detected" |
+ 1662  | echo "FAIL: Host Kernel Shared"'
+ 1663  clear
+ 1664  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo PASS; else echo FAIL; fi'
+ 1665  kubectl exec test-agent-kata -- sh -c 'if [ $(cut -d. -f1 /proc/uptime) -lt 7200 ]; then echo PASS; else echo FAIL; fi'
+ 1666  kubectl exec test-agent-kata -- sh -c 'if systemd-detect-virt -v | grep -qE "kvm|qemu|microsoft|amazon"; then echo PASS; else echo FAIL; fi'
+ 1667  kubectl exec test-agent-kata -- sh -c 'if grep -q "agent" /proc/cmdline; then echo PASS; else echo FAIL; fi'
+ 1668  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo PASS; else echo FAIL; fi'
+ 1669  kubectl exec test-agent-kata -- sh -c 'if cat /sys/class/dmi/id/product_name 2>/dev/null | grep -qiE "kvm|qemu|firecracker|amazon"; then echo PASS; else echo FAIL; fi'
+ 1670  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo PASS; else echo FAIL; fi'
+ 1671  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo PASS; else echo FAIL; fi'
+ 1672  kubectl exec test-agent-kata -- sh -c 'if [ $(free -g | grep Mem | awk "{print \$2}") -lt 16 ]; then echo PASS; else echo FAIL; fi'
+ 1673  kubectl exec test-agent-kata -- sh -c 'if grep -q "agent.use_vsock" /proc/1/cmdline; then echo "PASS: Sandbox Trapped"; else echo "FAIL: Host Exposed"; fi'
+ 1674  kubectl exec test-agent-kata -- sh -c 'if [ -b /dev/vda ] |
+ 1675  | [ -b /dev/pmem0 ] |
+ 1676  | [ -b /dev/vdb ]; then echo PASS; else echo FAIL; fi'
+ 1677  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "qemu|kvm|virt|amazon|microsoft|firecracker" /sys/class/dmi/id/* 2>/dev/null; then echo PASS; else echo FAIL; fi'
+ 1678  kubectl exec test-agent-kata -- sh -c 'if grep -q "virtio" /proc/interrupts; then echo PASS; else echo FAIL; fi'
+ 1679  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo PASS; else echo FAIL; fi'
+ 1680  kubectl exec test-agent-kata -- sh -c 'if grep -q "agent" /proc/cmdline; then echo PASS; else echo FAIL; fi'
+ 1681  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo PASS; else echo FAIL; fi'
+ 1682  kubectl exec test-agent-kata -- sh -c 'if [ $(free -g | grep Mem | awk "{print \$2}") -lt 16 ]; then echo PASS; else echo FAIL; fi'
+ 1683  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo PASS; else echo FAIL; fi'
+ 1684  kubectl exec test-agent-kata -- sh -c 'if [ -c /dev/vsock ]; then echo PASS; else echo FAIL; fi'
+ 1685  kubectl exec test-agent-kata -- sh -c 'if [ -b /dev/vda ] |
+ 1686  | [ -b /dev/pmem0 ] |
+ 1687  | [ -b /dev/vdb ]; then echo PASS; else echo FAIL; fi'
+ 1688  kubectl exec test-agent-kata -- sh -c 'if [ -b /dev/vda ] || [ -b /dev/pmem0 ] || [ -b /dev/vdb ]; then echo PASS; else echo FAIL; fi'
+ 1689  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "qemu|kvm|virt|amazon|microsoft|firecracker" /sys/class/dmi/id/* 2>/dev/null; then echo PASS; else echo FAIL; fi'
+ 1690  kubectl exec test-agent-kata -- sh -c 'if grep -q "virtio" /proc/interrupts; then echo PASS; else echo FAIL; fi'
+ 1691  clear
+ 1692  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo "PASS: Guest Kernel Identified"; else echo "FAIL: Shared Host Kernel"; fi'
+ 1693  kubectl exec test-agent-kata -- sh -c 'UP=$(cut -d. -f1 /proc/uptime); if [ "$UP" -lt 7200 ]; then echo "PASS: Isolated Sandbox Uptime ($UP sec)"; else echo "FAIL: Node Uptime Leaked"; fi'
+ 1694  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "kata|agent|hvc" /proc/cmdline; then echo "PASS: Kata Boot Signatures Found"; else echo "FAIL: Standard Boot Parameters"; fi'
+ 1695  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1696  kubectl exec test-agent-kata -- sh -c 'MEM=$(free -g | grep Mem | awk "{print \$2}"); if [ "$MEM" -lt 16 ]; then echo "PASS: RAM Bounded by Sandbox (${MEM}GB)"; else echo "FAIL: Host RAM Leak (${MEM}GB)"; fi'
+ 1697  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo "PASS: Virtio Hardware Bus Present"; else echo "FAIL: No Virtual Hardware Detected"; fi'
+ 1698  clear
+ 1699  kubectl exec test-agent-kata -- sh -c 'if [ -c /dev/vsock ]; then echo "PASS: VSOCK Hardware Port Active"; else echo "FAIL: No VSOCK Support"; fi'
+ 1700  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "qemu|kvm|virt|amazon|microsoft|firecracker" /sys/class/dmi/id/* 2>/dev/null; then echo "PASS: Hypervisor Identity Confirmed"; else echo "FAIL: Physical Hardware Exposed"; fi'
+ 1701  kubectl exec test-agent-kata -- sh -c 'if grep -qi "virtio" /proc/interrupts; then echo "PASS: Virtualized Interrupts Detected"; else echo "FAIL: Physical Interrupt Map"; fi'
+ 1702  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo "PASS: VSOCK Protocol Supported"; else echo "FAIL: No VSOCK Support"; fi'
+ 1703  kubectl exec test-agent-kata -- sh -c 'if nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null | grep -vq "kata"; then echo "FAIL: Host Escape Possible"; else echo "PASS: Sandbox Escape Blocked"; fi'
+ 1704  clear
+ 1705  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo "PASS: Independent Kernel Identified"; else echo "FAIL: Shared Host Kernel"; fi'
+ 1706  uptime
+ 1707  kubectl exec test-agent-kata -- sh -c 'UP=$(cut -d. -f1 /proc/uptime); if [ "$UP" -lt 7200 ]; then echo "PASS: Isolated Sandbox Uptime ($UP sec)"; else echo "FAIL: Node Uptime Leaked"; fi'
+ 1708  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "agent|kata|init" /proc/cmdline; then echo "PASS: Kata Boot Signatures Found"; else echo "FAIL: Standard Boot Parameters"; fi'
+ 1709  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1710  kubectl exec test-agent-kata -- sh -c 'MEM=$(free -g | grep Mem | awk "{print \$2}"); if [ "$MEM" -lt 16 ]; then echo "PASS: RAM Bounded by Sandbox (${MEM}GB)"; else echo "FAIL: Host RAM Leak (${MEM}GB)"; fi'
+ 1711  clear
+ 1712  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo "PASS: Virtio Hardware Bus Present"; else echo "FAIL: No Virtual Hardware Detected"; fi'
+ 1713  kubectl exec test-agent-kata -- sh -c 'if ls /dev/vd* >/dev/null 2>&1 |
+ 1714  | ls /dev/pmem* >/dev/null 2>&1; then echo "PASS: Virtual Block Device Found"; else echo "FAIL: No Virtual Disk Detected"; fi'
+ 1715  clear
+ 1716  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo "PASS: VSOCK Protocol Supported"; else echo "FAIL: No VSOCK Support"; fi'
+ 1717  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "virtio|PCI-MSI" /proc/interrupts; then echo "PASS: Virtualized Interrupts Detected"; else echo "FAIL: Physical Interrupt Map"; fi'
+ 1718  kubectl exec test-agent-kata -- sh -c 'if nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null | grep -vq "kata"; then echo "FAIL: Host Escape Possible"; else echo "PASS: Sandbox Escape Blocked"; fi'
+ 1719  clear
+ 1720  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo "PASS: Independent Kernel Identified"; else echo "FAIL: Shared Host Kernel"; fi'
+ 1721  kubectl exec test-agent-kata -- sh -c 'UP=$(cut -d. -f1 /proc/uptime); if [ "$UP" -lt 7200 ]; then echo "PASS: Isolated Sandbox Uptime ($UP sec)"; else echo "FAIL: Node Uptime Leaked"; fi'
+ 1722  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "agent|kata|init" /proc/cmdline; then echo "PASS: Kata Boot Signatures Found"; else echo "FAIL: Standard Boot Parameters"; fi'
+ 1723  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1724  kubectl exec test-agent-kata -- sh -c 'MEM=$(free -g | grep Mem | awk "{print \$2}"); if [ "$MEM" -lt 16 ]; then echo "PASS: RAM Bounded by Sandbox (${MEM}GB)"; else echo "FAIL: Host RAM Leak (${MEM}GB)"; fi'
+ 1725  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo "PASS: Virtio Hardware Bus Present"; else echo "FAIL: No Virtual Hardware Detected"; fi'
+ 1726  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo "PASS: VSOCK Protocol Supported"; else echo "FAIL: No VSOCK Support"; fi'
+ 1727  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "virtio|PCI-MSI" /proc/interrupts; then echo "PASS: Virtualized Interrupts Detected"; else echo "FAIL: Physical Interrupt Map"; fi'
+ 1728  clear
+ 1729  kubectl exec test-agent-kata -- sh -c 'if nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null | grep -vq "kata"; then echo "FAIL: Host Escape Possible"; else echo "PASS: Sandbox Escape Blocked"; fi'
+ 1730  cd 
+ 1731  cd ai_sre/
+ 1732  git status
+ 1733  git add .
+ 1734  git commit -m 'adding deploy script'
+ 1735  git push
+ 1736  history | grep remote
+ 1737  git remote add origin https://github.com/si3mshady/ai_sre.git
+ 1738  git push
+ 1739  git push --set-upstream origin agentic-rag
+ 1740  git add .
+ 1741  git commit -m 'adding deploy script'
+ 1742  ls -lrth
+ 1743  kubectl get pods
+ 1744  cd
+ 1745  clear
+ 1746  minikube
+ 1747  claer
+ 1748  clear
+ 1749  history | grep minikube
+ 1750  cd  ai_sre/
+ 1751  ls -lrth
+ 1752  cd kind/
+ 1753  ls
+ 1754  cat setup_history_kind_cluster_and_gateway_krd | grep mini
+ 1755  vf
+ 1756  cd
+ 1757  ls -lrth
+ 1758  cd ai_sre/
+ 1759  ls -lrth
+ 1760  cd gvisor_kata/
+ 1761  ls -lrth
+ 1762  cat deploy_kata_test_pod.sh 
+ 1763  vi deploy_kata_test_pod.sh 
+ 1764  ls -lrth
+ 1765  vi kata.sh 
+ 1766  kubectl get pod
+ 1767  history | grep mini
+ 1768  minikube
+ 1769  cd
+ 1770  cd ai_sre/
+ 1771  ls -lrth
+ 1772  cd kind/
+ 1773  cd cd ../gvisor_kata/
+ 1774  cd ../gvisor_kata/
+ 1775  ls -lrth
+ 1776  cat deploy_kata_test_pod.sh 
+ 1777  clear
+ 1778  ls -lrth
+ 1779  vi deploy_kata_test_pod.sh 
+ 1780  vi kata.sh 
+ 1781  kubectl config get-contexts -o name
+ 1782  cd ../
+ 1783  ls 
+ 1784  cd ghost_kitchen_sre_k3s/ghost-kitchen-sre/
+ 1785  ls -lrth
+ 1786  cd k8s/
+ 1787  ls -lrth
+ 1788  kubectl apply -f .
+ 1789  cd
+ 1790  clear
+ 1791  ls -lrth
+ 1792  clear
+ 1793  minikube start  --driver=docker --container-runtime=containerd --cpus=4 --memory=8192
+ 1794  kubectl create namespace argocd
+ 1795  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+ 1796  kubectl get node
+ 1797  kubectl -n argocd get endpoints argocd-repo-server
+ 1798  # Restart to force endpoint population
+ 1799  kubectl -n argocd rollout restart deployment argocd-repo-server
+ 1800  kubectl -n argocd rollout restart deployment argocd-application-controller
+ 1801  kubectl -n argocd get endpoints argocd-repo-server
+ 1802  cd ai_sre/
+ 1803  ls -lrth
+ 1804  cd argo/
+ 1805  ls -lrth
+ 1806  history > argo_history2.txt 
+ 1807  kubectl port-forward svc/argocd-server -n argocd 8080:443
+ 1808  cd
+ 1809  history
+ 1810  cd ai_sre/gvisor_kata/
+ 1811  ls
+ 1812  cat kata.sh 
+ 1813  :q
+ 1814  clear
+ 1815  kubectl get pod -A
+ 1816  kubectl get pod -n kitchen-sre
+ 1817  cd ../
+ 1818  git commit -m 'adding deploy script'
+ 1819  git add .
+ 1820  git commit -m 'adding argo'
+ 1821  git push 
+ 1822  argocd admin initial-password -n argocd
+ 1823  argocd account update-password
+ 1824  argocd login Wf1PK-XYk4Sxb3Bp
+ 1825  argocd login localhost:8080 --username admin --password Wf1PK-XYk4Sxb3Bp --insecure
+ 1826  argocd account update-password --current-password Wf1PK-XYk4Sxb3Bp --new-password elliott
+ 1827  argocd account update-password --current-password Wf1PK-XYk4Sxb3Bp --new-password elliottarnold
+ 1828  cd
+ 1829  cd ai_sre/
+ 1830  mkdir argo
+ 1831  cd argo/
+ 1832  history > argo_history.txt
+ 1833  kubectl get context
+ 1834  kubectl config get-contexts -o name
+ 1835  argocd cluster add minikube
+ 1836  kubectl config set-context --current --namespace=argocd
+ 1837  argocd app get ai_sre
+ 1838  clear
+ 1839  argocd app get --help
+ 1840  clear
+ 1841  argocd app get ai-sre
+ 1842  kubectl get pods
+ 1843  cd ai_sre/
+ 1844  # On your local machine (host), check resource usage
+ 1845  top -p $(pgrep minikube)  # Kill if needed: pkill minikube
+ 1846  sudo systemctl restart xrdp
+ 1847  sudo loginctl terminate-session $(loginctl | grep xrdp | awk '{print $1}')
+ 1848  # Reconnect via Remmina using your usual RDP settings
+ 1849  top -p $(pgrep minikube
+ 1850  top -p $(pgrep minikube)
+ 1851  top $(pgrep minikube)
+ 1852  clear
+ 1853  sudo systemctl restart xrdp
+ 1854  sudo loginctl terminate-session $(loginctl | grep xrdp | awk '{print $1}')
+ 1855  sudo systemctl restart xrdp
+ 1856  sudo loginctl terminate-session $(loginctl | grep xrdp | awk '{print $1}')
+ 1857  cd ai_sre/
+ 1858  ls -lrth
+ 1859  cd argo/
+ 1860  ls -lrth
+ 1861  cd ../gvisor_kata/
+ 1862  ls -lrth
+ 1863  cat kata.sh 
+ 1864  cd ../
+ 1865  ls -lrth
+ 1866  cd kind/
+ 1867  ls -lrth
+ 1868  cd ../
+ 1869  cd kind/
+ 1870  ls -lrth
+ 1871  cat setup_history_kind_cluster_and_gateway_krd 
+ 1872  ls -lrth
+ 1873  cd ../
+ 1874  ls -lrth
+ 1875  cd traefik/
+ 1876  ls -lrth
+ 1877  cat traefik.yaml 
+ 1878  cd
+ 1879  vi setup_env.sh
+ 1880  bash setup_env.sh 
+ 1881  sudo bash setup_env.sh 
+ 1882  cd
+ 1883  ls -lrth
+ 1884  cd ai_sre/
+ 1885  ls -lrth
+ 1886  cd gvisor_kata/
+ 1887  ls -lrth
+ 1888  bash kata.sh 
+ 1889  ls -lrth
+ 1890  cd ../
+ 1891  ls -lrth
+ 1892  cd kind/
+ 1893  ls -lrth
+ 1894  cat setup_history_kind_cluster_and_gateway_krd 
+ 1895  cd ../
+ 1896  cd traefik/
+ 1897  helm install traefik traefik/traefik   --namespace traefik   --create-namespace   --version 37.3.0   -f traefik.yaml --skip-crds
+ 1898  cd ../
+ 1899  cd ls -lrth
+ 1900  ls -lrth
+ 1901  cd kind/
+ 1902  ls -lrth
+ 1903  cat setup_history_kind_cluster_and_gateway_krd 
+ 1904  clear
+ 1905  ls -lrth
+ 1906  cd
+ 1907  history
+ 1908  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
+ 1909  
+ 1910  vi install traefik_gateway_crd.sh
+ 1911  ls -lrth
+ 1912  vi install traefik_gateway_crd.sh
+ 1913  ls -lrth
+ 1914  vi traefik_gateway_crd.sh
+ 1915  vi install traefik_gateway_crd.sh
+ 1916  > install traefik_gateway_crd.sh
+ 1917  vi install_traefik_gateway_crd.sh
+ 1918  ls -lrth
+ 1919  bash install_traefik_gateway_crd.sh 
+ 1920  mv install_traefik_gateway_crd.sh  ai_sre/
+ 1921  clear
+ 1922  ls -lrth
+ 1923  cd ai_sre/
+ 1924  ls -lrth
+ 1925  cd gvisor_kata/
+ 1926  ls -lrth
+ 1927  cat deploy_kata_test_pod.sh 
+ 1928  ls -lrth
+ 1929  bash deploy_kata_test_pod.sh 
+ 1930  kubectl get pods
+ 1931  kubectl describe pod test-agent-kata| grep kata
+ 1932  cd ../
+ 1933  ls -lrth
+ 1934  cd ../
+ 1935  ls -lrth
+ 1936  cd ../
+ 1937  ls -lrth
+ 1938  cd
+ 1939  ls -lrth
+ 1940  cd ai_sre/
+ 1941  ls -lrth
+ 1942  cat install_traefik_gateway_crd.sh 
+ 1943  clear
+ 1944  ls -lrth
+ 1945  clear
+ 1946  l s-lrth
+ 1947  ls -lrth
+ 1948  cd gvisor_kata/
+ 1949  cd ../
+ 1950  git push 
+ 1951  git add .; git commit -m 'added setup script'; git push 
+ 1952  cd
+ 1953  ls -lrth
+ 1954  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1955  ls -lrth
+ 1956  vi dashboard-gateway-infra.yaml 
+ 1957  vi app-deployments.yaml 
+ 1958  kubectl apply -f .
+ 1959  kubectl get pods -n kitchen-sre
+ 1960  kubectl get pods -n kitchen-sre -w
+ 1961  kubectl get pods -n kitchen-sre
+ 1962  kubectl describe pod redpanda-0 -n kitchen-sre
+ 1963  kubectl get pods -n kitchen-sre
+ 1964  kubectl describe pod redpanda-0 -n kitchen-sre
+ 1965  cd
+ 1966  ls -lrth
+ 1967  cd ai_sre/
+ 1968  ls -lrth
+ 1969  cd gvisor_kata/
+ 1970  ls -lrth
+ 1971  cp kata.sh start_minikube.sh
+ 1972  bash start_minikube.sh 
+ 1973  minikube addons enable gvisor --profile kata-cluster
+ 1974  ls -lrth
+ 1975  cd ../
+ 1976  ls -lrth
+ 1977  cd kind/
+ 1978  ls -lrth
+ 1979  cd ../gvisor_kata/
+ 1980  history > gvisor_minikube_start.txt
