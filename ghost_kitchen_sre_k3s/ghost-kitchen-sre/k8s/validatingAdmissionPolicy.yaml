@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: enforce-gvisor-runtime
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: "object.spec.runtimeClassName == 'gvisor'"
+      message: "Security Violation: All pods must use the 'gvisor' runtimeClassName."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: enforce-gvisor-runtime-binding
+spec:
+  policyName: enforce-gvisor-runtime
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector: {}
