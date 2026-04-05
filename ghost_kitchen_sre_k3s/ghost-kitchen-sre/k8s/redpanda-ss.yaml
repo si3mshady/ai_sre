@@ -28,7 +28,6 @@ spec:
         app: redpanda
     spec:
       runtimeClassName: gvisor
-
       containers:
       - name: redpanda
         command:
