@@ -22,4 +22,12 @@ spec:
   policyName: enforce-gvisor-runtime
   validationActions: [Deny]
   matchResources:
-    namespaceSelector: {}
+    namespaceSelector:
+      matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: NotIn
+        values:
+        - argocd
+        - traefik
+        - kyverno
+        - kube-system

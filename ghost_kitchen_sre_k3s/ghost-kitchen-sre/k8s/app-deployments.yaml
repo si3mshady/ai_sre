@@ -40,6 +40,8 @@ spec:
       labels:
         app: producer
     spec:
+      runtimeClassName: gvisor
+
       containers:
       - name: producer
         imagePullPolicy: Always
