@@ -1,3 +1,6 @@
+helm repo add traefik https://traefik.github.io/charts
+
+
 helm install traefik traefik/traefik   --namespace traefik   --create-namespace   --version 37.3.0   -f traefik.yaml --skip-crds
 
 

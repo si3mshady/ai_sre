@@ -9,6 +9,15 @@ sleep 30
 
 minikube addons enable gvisor --profile="$PROFILE"
 
+
+sleep 30 
+
+
+helm repo add traefik https://traefik.github.io/charts
+
+
+
+
 helm install traefik traefik/traefik   --namespace traefik   --create-namespace   --version 37.3.0   -f ./traefik.yaml --skip-crds
 
 
