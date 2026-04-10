@@ -24,7 +24,7 @@ spec:
       labels:
         app: ollama
     spec:
-      runtimeClassName: gvisor
+      #runtimeClassName: gvisor
       initContainers:
       - name: pull-model
         volumeMounts: # <--- THIS WAS MISSING

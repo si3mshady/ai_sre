@@ -1,0 +1,1000 @@
+ 1044  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "kata|agent|hvc" /proc/cmdline; then echo "PASS: Kata Boot Signatures Found"; else echo "FAIL: Standard Boot Parameters"; fi'
+ 1045  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1046  kubectl exec test-agent-kata -- sh -c 'MEM=$(free -g | grep Mem | awk "{print \$2}"); if [ "$MEM" -lt 16 ]; then echo "PASS: RAM Bounded by Sandbox (${MEM}GB)"; else echo "FAIL: Host RAM Leak (${MEM}GB)"; fi'
+ 1047  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo "PASS: Virtio Hardware Bus Present"; else echo "FAIL: No Virtual Hardware Detected"; fi'
+ 1048  clear
+ 1049  kubectl exec test-agent-kata -- sh -c 'if [ -c /dev/vsock ]; then echo "PASS: VSOCK Hardware Port Active"; else echo "FAIL: No VSOCK Support"; fi'
+ 1050  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "qemu|kvm|virt|amazon|microsoft|firecracker" /sys/class/dmi/id/* 2>/dev/null; then echo "PASS: Hypervisor Identity Confirmed"; else echo "FAIL: Physical Hardware Exposed"; fi'
+ 1051  kubectl exec test-agent-kata -- sh -c 'if grep -qi "virtio" /proc/interrupts; then echo "PASS: Virtualized Interrupts Detected"; else echo "FAIL: Physical Interrupt Map"; fi'
+ 1052  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo "PASS: VSOCK Protocol Supported"; else echo "FAIL: No VSOCK Support"; fi'
+ 1053  kubectl exec test-agent-kata -- sh -c 'if nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null | grep -vq "kata"; then echo "FAIL: Host Escape Possible"; else echo "PASS: Sandbox Escape Blocked"; fi'
+ 1054  clear
+ 1055  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo "PASS: Independent Kernel Identified"; else echo "FAIL: Shared Host Kernel"; fi'
+ 1056  uptime
+ 1057  kubectl exec test-agent-kata -- sh -c 'UP=$(cut -d. -f1 /proc/uptime); if [ "$UP" -lt 7200 ]; then echo "PASS: Isolated Sandbox Uptime ($UP sec)"; else echo "FAIL: Node Uptime Leaked"; fi'
+ 1058  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "agent|kata|init" /proc/cmdline; then echo "PASS: Kata Boot Signatures Found"; else echo "FAIL: Standard Boot Parameters"; fi'
+ 1059  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1060  kubectl exec test-agent-kata -- sh -c 'MEM=$(free -g | grep Mem | awk "{print \$2}"); if [ "$MEM" -lt 16 ]; then echo "PASS: RAM Bounded by Sandbox (${MEM}GB)"; else echo "FAIL: Host RAM Leak (${MEM}GB)"; fi'
+ 1061  clear
+ 1062  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo "PASS: Virtio Hardware Bus Present"; else echo "FAIL: No Virtual Hardware Detected"; fi'
+ 1063  kubectl exec test-agent-kata -- sh -c 'if ls /dev/vd* >/dev/null 2>&1 |
+ 1064  | ls /dev/pmem* >/dev/null 2>&1; then echo "PASS: Virtual Block Device Found"; else echo "FAIL: No Virtual Disk Detected"; fi'
+ 1065  clear
+ 1066  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo "PASS: VSOCK Protocol Supported"; else echo "FAIL: No VSOCK Support"; fi'
+ 1067  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "virtio|PCI-MSI" /proc/interrupts; then echo "PASS: Virtualized Interrupts Detected"; else echo "FAIL: Physical Interrupt Map"; fi'
+ 1068  kubectl exec test-agent-kata -- sh -c 'if nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null | grep -vq "kata"; then echo "FAIL: Host Escape Possible"; else echo "PASS: Sandbox Escape Blocked"; fi'
+ 1069  clear
+ 1070  kubectl exec test-agent-kata -- sh -c 'if uname -a | grep -qiE "kata|mshv|virt"; then echo "PASS: Independent Kernel Identified"; else echo "FAIL: Shared Host Kernel"; fi'
+ 1071  kubectl exec test-agent-kata -- sh -c 'UP=$(cut -d. -f1 /proc/uptime); if [ "$UP" -lt 7200 ]; then echo "PASS: Isolated Sandbox Uptime ($UP sec)"; else echo "FAIL: Node Uptime Leaked"; fi'
+ 1072  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "agent|kata|init" /proc/cmdline; then echo "PASS: Kata Boot Signatures Found"; else echo "FAIL: Standard Boot Parameters"; fi'
+ 1073  kubectl exec test-agent-kata -- sh -c 'if grep -q "hypervisor" /proc/cpuinfo; then echo "PASS: CPU Virtualization Active"; else echo "FAIL: Physical CPU Exposed"; fi'
+ 1074  kubectl exec test-agent-kata -- sh -c 'MEM=$(free -g | grep Mem | awk "{print \$2}"); if [ "$MEM" -lt 16 ]; then echo "PASS: RAM Bounded by Sandbox (${MEM}GB)"; else echo "FAIL: Host RAM Leak (${MEM}GB)"; fi'
+ 1075  kubectl exec test-agent-kata -- sh -c 'if [ -d /sys/bus/virtio/devices ]; then echo "PASS: Virtio Hardware Bus Present"; else echo "FAIL: No Virtual Hardware Detected"; fi'
+ 1076  kubectl exec test-agent-kata -- sh -c 'if grep -q "00000028" /proc/net/protocols; then echo "PASS: VSOCK Protocol Supported"; else echo "FAIL: No VSOCK Support"; fi'
+ 1077  kubectl exec test-agent-kata -- sh -c 'if grep -qiE "virtio|PCI-MSI" /proc/interrupts; then echo "PASS: Virtualized Interrupts Detected"; else echo "FAIL: Physical Interrupt Map"; fi'
+ 1078  clear
+ 1079  kubectl exec test-agent-kata -- sh -c 'if nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null | grep -vq "kata"; then echo "FAIL: Host Escape Possible"; else echo "PASS: Sandbox Escape Blocked"; fi'
+ 1080  cd 
+ 1081  cd ai_sre/
+ 1082  git status
+ 1083  git add .
+ 1084  git commit -m 'adding deploy script'
+ 1085  git push
+ 1086  history | grep remote
+ 1087  git remote add origin https://github.com/si3mshady/ai_sre.git
+ 1088  git push
+ 1089  git push --set-upstream origin agentic-rag
+ 1090  git add .
+ 1091  git commit -m 'adding deploy script'
+ 1092  ls -lrth
+ 1093  kubectl get pods
+ 1094  cd
+ 1095  clear
+ 1096  minikube
+ 1097  claer
+ 1098  clear
+ 1099  history | grep minikube
+ 1100  cd  ai_sre/
+ 1101  ls -lrth
+ 1102  cd kind/
+ 1103  ls
+ 1104  cat setup_history_kind_cluster_and_gateway_krd | grep mini
+ 1105  vf
+ 1106  cd
+ 1107  ls -lrth
+ 1108  cd ai_sre/
+ 1109  ls -lrth
+ 1110  cd gvisor_kata/
+ 1111  ls -lrth
+ 1112  cat deploy_kata_test_pod.sh 
+ 1113  vi deploy_kata_test_pod.sh 
+ 1114  ls -lrth
+ 1115  vi kata.sh 
+ 1116  kubectl get pod
+ 1117  history | grep mini
+ 1118  minikube
+ 1119  cd
+ 1120  cd ai_sre/
+ 1121  ls -lrth
+ 1122  cd kind/
+ 1123  cd cd ../gvisor_kata/
+ 1124  cd ../gvisor_kata/
+ 1125  ls -lrth
+ 1126  cat deploy_kata_test_pod.sh 
+ 1127  clear
+ 1128  ls -lrth
+ 1129  vi deploy_kata_test_pod.sh 
+ 1130  vi kata.sh 
+ 1131  kubectl config get-contexts -o name
+ 1132  cd ../
+ 1133  ls 
+ 1134  cd ghost_kitchen_sre_k3s/ghost-kitchen-sre/
+ 1135  ls -lrth
+ 1136  cd k8s/
+ 1137  ls -lrth
+ 1138  kubectl apply -f .
+ 1139  cd
+ 1140  clear
+ 1141  ls -lrth
+ 1142  clear
+ 1143  minikube start  --driver=docker --container-runtime=containerd --cpus=4 --memory=8192
+ 1144  kubectl create namespace argocd
+ 1145  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+ 1146  kubectl get node
+ 1147  kubectl -n argocd get endpoints argocd-repo-server
+ 1148  # Restart to force endpoint population
+ 1149  kubectl -n argocd rollout restart deployment argocd-repo-server
+ 1150  kubectl -n argocd rollout restart deployment argocd-application-controller
+ 1151  kubectl -n argocd get endpoints argocd-repo-server
+ 1152  cd ai_sre/
+ 1153  ls -lrth
+ 1154  cd argo/
+ 1155  ls -lrth
+ 1156  history > argo_history2.txt 
+ 1157  kubectl port-forward svc/argocd-server -n argocd 8080:443
+ 1158  cd
+ 1159  history
+ 1160  cd ai_sre/gvisor_kata/
+ 1161  ls
+ 1162  cat kata.sh 
+ 1163  :q
+ 1164  clear
+ 1165  kubectl get pod -A
+ 1166  kubectl get pod -n kitchen-sre
+ 1167  cd ../
+ 1168  git commit -m 'adding deploy script'
+ 1169  git add .
+ 1170  git commit -m 'adding argo'
+ 1171  git push 
+ 1172  argocd admin initial-password -n argocd
+ 1173  argocd account update-password
+ 1174  argocd login Wf1PK-XYk4Sxb3Bp
+ 1175  argocd login localhost:8080 --username admin --password Wf1PK-XYk4Sxb3Bp --insecure
+ 1176  argocd account update-password --current-password Wf1PK-XYk4Sxb3Bp --new-password elliott
+ 1177  argocd account update-password --current-password Wf1PK-XYk4Sxb3Bp --new-password elliottarnold
+ 1178  cd
+ 1179  cd ai_sre/
+ 1180  mkdir argo
+ 1181  cd argo/
+ 1182  history > argo_history.txt
+ 1183  kubectl get context
+ 1184  kubectl config get-contexts -o name
+ 1185  argocd cluster add minikube
+ 1186  kubectl config set-context --current --namespace=argocd
+ 1187  argocd app get ai_sre
+ 1188  clear
+ 1189  argocd app get --help
+ 1190  clear
+ 1191  argocd app get ai-sre
+ 1192  kubectl get pods
+ 1193  cd ai_sre/
+ 1194  # On your local machine (host), check resource usage
+ 1195  top -p $(pgrep minikube)  # Kill if needed: pkill minikube
+ 1196  sudo systemctl restart xrdp
+ 1197  sudo loginctl terminate-session $(loginctl | grep xrdp | awk '{print $1}')
+ 1198  # Reconnect via Remmina using your usual RDP settings
+ 1199  top -p $(pgrep minikube
+ 1200  top -p $(pgrep minikube)
+ 1201  top $(pgrep minikube)
+ 1202  clear
+ 1203  sudo systemctl restart xrdp
+ 1204  sudo loginctl terminate-session $(loginctl | grep xrdp | awk '{print $1}')
+ 1205  sudo systemctl restart xrdp
+ 1206  sudo loginctl terminate-session $(loginctl | grep xrdp | awk '{print $1}')
+ 1207  cd ai_sre/
+ 1208  ls -lrth
+ 1209  cd argo/
+ 1210  ls -lrth
+ 1211  cd ../gvisor_kata/
+ 1212  ls -lrth
+ 1213  cat kata.sh 
+ 1214  cd ../
+ 1215  ls -lrth
+ 1216  cd kind/
+ 1217  ls -lrth
+ 1218  cd ../
+ 1219  cd kind/
+ 1220  ls -lrth
+ 1221  cat setup_history_kind_cluster_and_gateway_krd 
+ 1222  ls -lrth
+ 1223  cd ../
+ 1224  ls -lrth
+ 1225  cd traefik/
+ 1226  ls -lrth
+ 1227  cat traefik.yaml 
+ 1228  cd
+ 1229  vi setup_env.sh
+ 1230  bash setup_env.sh 
+ 1231  sudo bash setup_env.sh 
+ 1232  cd
+ 1233  ls -lrth
+ 1234  cd ai_sre/
+ 1235  ls -lrth
+ 1236  cd gvisor_kata/
+ 1237  ls -lrth
+ 1238  bash kata.sh 
+ 1239  ls -lrth
+ 1240  cd ../
+ 1241  ls -lrth
+ 1242  cd kind/
+ 1243  ls -lrth
+ 1244  cat setup_history_kind_cluster_and_gateway_krd 
+ 1245  cd ../
+ 1246  cd traefik/
+ 1247  helm install traefik traefik/traefik   --namespace traefik   --create-namespace   --version 37.3.0   -f traefik.yaml --skip-crds
+ 1248  cd ../
+ 1249  cd ls -lrth
+ 1250  ls -lrth
+ 1251  cd kind/
+ 1252  ls -lrth
+ 1253  cat setup_history_kind_cluster_and_gateway_krd 
+ 1254  clear
+ 1255  ls -lrth
+ 1256  cd
+ 1257  history
+ 1258  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
+ 1259  
+ 1260  vi install traefik_gateway_crd.sh
+ 1261  ls -lrth
+ 1262  vi install traefik_gateway_crd.sh
+ 1263  ls -lrth
+ 1264  vi traefik_gateway_crd.sh
+ 1265  vi install traefik_gateway_crd.sh
+ 1266  > install traefik_gateway_crd.sh
+ 1267  vi install_traefik_gateway_crd.sh
+ 1268  ls -lrth
+ 1269  bash install_traefik_gateway_crd.sh 
+ 1270  mv install_traefik_gateway_crd.sh  ai_sre/
+ 1271  clear
+ 1272  ls -lrth
+ 1273  cd ai_sre/
+ 1274  ls -lrth
+ 1275  cd gvisor_kata/
+ 1276  ls -lrth
+ 1277  cat deploy_kata_test_pod.sh 
+ 1278  ls -lrth
+ 1279  bash deploy_kata_test_pod.sh 
+ 1280  kubectl get pods
+ 1281  kubectl describe pod test-agent-kata| grep kata
+ 1282  cd ../
+ 1283  ls -lrth
+ 1284  cd ../
+ 1285  ls -lrth
+ 1286  cd ../
+ 1287  ls -lrth
+ 1288  cd
+ 1289  ls -lrth
+ 1290  cd ai_sre/
+ 1291  ls -lrth
+ 1292  cat install_traefik_gateway_crd.sh 
+ 1293  clear
+ 1294  ls -lrth
+ 1295  clear
+ 1296  l s-lrth
+ 1297  ls -lrth
+ 1298  cd gvisor_kata/
+ 1299  cd ../
+ 1300  git push 
+ 1301  git add .; git commit -m 'added setup script'; git push 
+ 1302  cd
+ 1303  ls -lrth
+ 1304  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1305  ls -lrth
+ 1306  vi dashboard-gateway-infra.yaml 
+ 1307  vi app-deployments.yaml 
+ 1308  kubectl apply -f .
+ 1309  kubectl get pods -n kitchen-sre
+ 1310  kubectl get pods -n kitchen-sre -w
+ 1311  kubectl get pods -n kitchen-sre
+ 1312  kubectl describe pod redpanda-0 -n kitchen-sre
+ 1313  kubectl get pods -n kitchen-sre
+ 1314  kubectl describe pod redpanda-0 -n kitchen-sre
+ 1315  cd ../
+ 1316  cd 
+ 1317  clear
+ 1318  ls -lrth
+ 1319  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1320  kubectl apply -f 
+ 1321  kubectl apply -f .
+ 1322  kubectl delete -f .
+ 1323  vi app-deployments.yaml 
+ 1324  ls -lrth
+ 1325  rm gvisor_runtime.yaml 
+ 1326  ls -lrth
+ 1327  vi redpanda-ss.yaml 
+ 1328  vi ollama-deploy.yaml 
+ 1329  kubectl delete -f .
+ 1330  kubectl apply -f .
+ 1331  ls -lrth
+ 1332  vi app-deployments.yaml 
+ 1333  kubectl apply -f app-deployments.yaml 
+ 1334  kubectl delete -f app-deployments.yaml 
+ 1335  kubectl delete -f .
+ 1336  kubectl apply -f .
+ 1337  kubectl delete -f .
+ 1338  ls -lrth
+ 1339  kubectl apply -f app-deployments.yaml 
+ 1340  kubectl apply -f kitchen-infra.yaml 
+ 1341  kubectl apply -f app-deployments.yaml 
+ 1342  kubectl get pods -A
+ 1343  kubectl get deployments -A
+ 1344  kubectl describe deployment kitchen-dashboard -n kitchen-sre
+ 1345  # 1. Check ReplicaSet events (CRITICAL)
+ 1346  kubectl describe replicaset kitchen-dashboard-7df945fc6d
+ 1347  # 2. Find the failed pod name
+ 1348  kubectl get pods --selector=app=kitchen-dashboard -o wide
+ 1349  # 3. Describe THAT specific pod
+ 1350  kubectl describe pod [POD_NAME_FROM_STEP_2]
+ 1351  # 4. Check pod logs if it exists
+ 1352  kubectl logs [POD_NAME_FROM_STEP_2] --previous
+ 1353  clear
+ 1354  kubectl get rs -A
+ 1355  kubectl logs kitchen-dashboard-7df945fc6d --previous -n kitchen-sre
+ 1356  kubectl describe kitchen-dashboard-7df945fc6d  -n kitchen-sre
+ 1357  kubectl describe rs kitchen-dashboard-7df945fc6d  -n kitchen-sre
+ 1358  ls -lrth
+ 1359  vi app-deployments.yaml 
+ 1360  vi dashboard-rbac.yaml 
+ 1361  kubectl apply -f dashboard-rbac.yaml 
+ 1362  kubectl apply -f .
+ 1363  kubectl delete -f .
+ 1364  ls -lrth
+ 1365  kubectl apply -f dashboard-rbac.yaml 
+ 1366  kubectl apply -f kitchen-infra.yaml 
+ 1367  kubectl apply -f dashboard-rbac.yaml 
+ 1368  kubectl apply -f app-deployments.yaml 
+ 1369  kubectl apply -f dashboard-rbac.yaml 
+ 1370  kubectl apply -f app-deployments.yaml 
+ 1371  kubectl apply -f dashboard-rbac.yaml 
+ 1372  kubectl apply -f .
+ 1373  vi app-deployments.yaml 
+ 1374  kubectl get runtimeClass
+ 1375  kubectl get runtimeClass | grep gv
+ 1376  minikube addons enable gvisor
+ 1377  minikube profile list
+ 1378  cd 
+ 1379  ls -lrth
+ 1380  cd ai_sre/
+ 1381  git add .; git commit -m 'added setup script'; git push 
+ 1382  cd
+ 1383  vi master_launcher.sh
+ 1384  ls -lrth
+ 1385  cp master_launcher.sh ai_sre/traefik/
+ 1386  cd ai_sre/traefik/
+ 1387  ls -lrt
+ 1388  bash master_launcher.sh 
+ 1389  vi master_launcher.sh 
+ 1390  clear
+ 1391  kubectl get pods A
+ 1392  kubectl get pods -n kitchen-sre
+ 1393  kubectl get rs -n kitchen-sre
+ 1394  kubectl describe  rs ollama-5954fd4bd7 -n kitchen-sre
+ 1395  kubectl get pods -n kitchen-sre
+ 1396  kubectl describe  rs ollama-5954fd4bd7 -n kitchen-sre
+ 1397  kubectl get pods -n kitchen-sre
+ 1398  kubectl describe  pod ollama-5954fd4bd7-ptqz2 -n kitchen-sre
+ 1399  kubectl logs  pod ollama-5954fd4bd7-ptqz2 -n kitchen-sre
+ 1400  kubectl get pods -n kitchen-sre
+ 1401  kubectl run test-busybox --image=busybox --rm -it --restart=Never -- sleep 3600
+ 1402  cd 
+ 1403  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/\
+ 1404  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1405  ls -lrth
+ 1406  vi app-deployments.yaml 
+ 1407  vi redpanda-ss.yaml 
+ 1408  vi flink-job-infra.yaml 
+ 1409  kubectl delete -f .
+ 1410  kubectl apply  -f .
+ 1411  kubectl delete -f .
+ 1412  kubectl apply  -f .
+ 1413  vi validatingAdmissionPolicy.yaml 
+ 1414  cd
+ 1415  ls -lrth
+ 1416  cd ai_sre/
+ 1417  cd ghost_kitchen_sre_k3s/ghost-kitchen-sre/
+ 1418  ls -lrth
+ 1419  cd k8s/
+ 1420  ls -lrth
+ 1421  kubectl apply -f .
+ 1422  vi validatingAdmissionPolicy.yaml
+ 1423  kubectl apply -f validatingAdmissionPolicy.yaml 
+ 1424  ls -lrth
+ 1425  vi validatingAdmissionPolicy.yaml 
+ 1426  kubectl get namespaces
+ 1427  vi validatingAdmissionPolicy.yaml 
+ 1428  kubectl delete -f validatingAdmissionPolicy.yaml 
+ 1429  vi validatingAdmissionPolicy.yaml 
+ 1430  kubectl apply  -f validatingAdmissionPolicy.yaml 
+ 1431  kubectl get pods -a
+ 1432  kubectl get pods -A
+ 1433  kubectl delete -f .
+ 1434  kubectl get pods -A
+ 1435  kubectl apply -f .
+ 1436  kubectl get pods -A
+ 1437  kubectl get pods -n kitchen-sre\
+ 1438  kubectl get pods -n kitchen-sre
+ 1439  kubectl delete pod redpanda-0  kitchen-sre
+ 1440  kubectl delete pod redpanda-0 -n  kitchen-sre
+ 1441  kubectl get pods -n kitchen-sre
+ 1442  kubectl get  ss  kitchen-sre
+ 1443  kubectl get  statefulset  kitchen-sre
+ 1444  kubectl get  statefulset  -n  kitchen-sre
+ 1445  kubectl describe  statefulset  -n  kitchen-sre
+ 1446  ls -lrth 
+ 1447  vi redpanda-ss.yaml 
+ 1448  # 1. Delete the failing pod (StatefulSet will recreate it)
+ 1449  kubectl -n kitchen-sre delete pod redpanda-0 --force
+ 1450  # 2. OR delete entire StatefulSet (ArgoCD recreates from Git)
+ 1451  kubectl -n kitchen-sre delete statefulset redpanda
+ 1452  delete -f .
+ 1453  kubectl delete -f .
+ 1454  clear
+ 1455  kubectl apply  -f .
+ 1456  ls -lrth
+ 1457  vi validatingAdmissionPolicy.yaml 
+ 1458  delete -f .
+ 1459  kubectl delete -f .
+ 1460  kubectl apply -f .
+ 1461  cat app-deployments.yaml | grep gvis
+ 1462  grep -R gvisor .
+ 1463  ls -lrth
+ 1464  vi validatingAdmissionPolicy.yaml 
+ 1465  kubectl delete -f .
+ 1466  kubectl apply -f .
+ 1467  grep -R gvisor .
+ 1468  vi validatingAdmissionPolicy.yaml 
+ 1469  cd ai_sre/
+ 1470  git add .; git commit -m 'added setup script'; git push 
+ 1471  argocd admin initial-password -n argocd
+ 1472  cd argo/
+ 1473  ls -lrth
+ 1474  cat argo_history2.txt 
+ 1475  cat argo_history2.txt | grep argo
+ 1476  cat argo_history2.txt | grep update
+ 1477  cat argo_history2.txt | grep login
+ 1478  # 1. Get ArgoCD server URL (minikube)
+ 1479  minikube service argocd-server -n argocd --url
+ 1480  # 2. Get initial admin password
+ 1481  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+ 1482  minikube service argocd-server -n argocd --url --profile=gvisor-cluster
+ 1483  argocd admin initial-password -n argocd
+ 1484  argocd login localhost:8080 --username admin --password qrb3QT0BCV6NaJuE --insecure
+ 1485  argocd account update-password --current-password qrb3QT0BCV6NaJuE --new-password elliottArnold
+ 1486  kubectl config get-contexts -o name
+ 1487  argocd cluster add gvisor-cluster
+ 1488  kubectl config set-context --current --namespace=argocd
+ 1489  cd ../
+ 1490  git add .; git commit -m 'added setup script'; git push 
+ 1491  ls -lrth
+ 1492  cp traefik/master_launcher.sh .
+ 1493  git add .; git commit -m 'added setup script'; git push 
+ 1494  touch touchbase 
+ 1495  clear
+ 1496  kubectl run pod redis
+ 1497  kubectl run pod redis/redis
+ 1498  kubectl run pod --image=redis/redis
+ 1499  kubectl get pod 
+ 1500  rm pod pod
+ 1501  kubectl delete pod pod
+ 1502  kubectl run pod --image=redis/redis -n default
+ 1503  clear
+ 1504  kubectl run pod --image=redis/redis -n default
+ 1505  kubectl run pod --image=redis/redis 
+ 1506  kubectl get-context
+ 1507  kubectl get namespace
+ 1508  kubectl get current context
+ 1509  clear
+ 1510  kubectl get runtimeClass
+ 1511  clear
+ 1512  kubectl get runtimeClass
+ 1513  kubecl run pod --image=redis -n default
+ 1514  kubectl run pod --image=redis -n default
+ 1515  clear
+ 1516  kubectl run pod --image=redis -n default
+ 1517  kubectl config current-context
+ 1518  kubectl config get-context
+ 1519  clear
+ 1520  kubectl get pods -n kitchen-sre
+ 1521  clear
+ 1522  kubectl run pod --image=redis -n argocd
+ 1523  kubectl run pod2 --image=redis -n argocd
+ 1524  kubectl run thisWillRunBecauseWhitelisted --image=redis -n argocd
+ 1525  kubectl run Whitelisted --image=redis -n argocd
+ 1526  kubectl run whitelisted --image=redis -n argocd
+ 1527  clear
+ 1528  kubectl get pods -n argocd
+ 1529  clear
+ 1530  kubectl get runtimeClass
+ 1531  kubectl run blocked --image=redis -n default
+ 1532  clear
+ 1533  kubectl run not-gonna-run --image=redis -n default
+ 1534  clear
+ 1535  kubectl run whitelisted-in-policy --image=redis -n argocd
+ 1536  kubectl run this-will-run-too --image=redis -n argocd
+ 1537  git add .; git commit -m 'added setup script'; git push 
+ 1538  cd
+ 1539  ls -lrth
+ 1540  cd ai_sre/
+ 1541  ls -lrth
+ 1542  cd gvisor_kata/
+ 1543  ls -lrth
+ 1544  vi start_minikube.sh 
+ 1545  cat gvisor_minikube_start_history.txt 
+ 1546  ls -lrth
+ 1547  cd ../
+ 1548  ls -lrth
+ 1549  vi install_traefik_gateway_crd.sh 
+ 1550  cd traefik/
+ 1551  ls -lrth
+ 1552  vi master_launcher.sh 
+ 1553  helm repo add kyverno https://kyverno.github.io/kyverno/
+ 1554  helm repo update
+ 1555  helm install kyverno kyverno/kyverno -n kyverno --create-namespace
+ 1556  vi master_launcher.sh 
+ 1557  clear
+ 1558  kubectl create namespace argocd
+ 1559  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+ 1560  kubectl config set-context --current --namespace=argocd
+ 1561  kubectl port-forward svc/argocd-server -n argocd 8080:443
+ 1562  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+ 1563  kubectl port-forward svc/argocd-server -n argocd 8080:443
+ 1564  kubectl get pods -A
+ 1565  kubectl logs kitchen-agent-75986796d-jhg22 -n kitchen-sre
+ 1566  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+ 1567  kubectl get pods -A
+ 1568  kubectl port-forward svc/argocd-server -n argocd 8080:443
+ 1569  ls -lrth
+ 1570  vi master_launcher.sh 
+ 1571  cd ../
+ 1572  git add .; git commit -m 'added setup script'; git push 
+ 1573  kubectl port-forward svc/argocd-server -n argocd 8080:443
+ 1574  cd 
+ 1575  clear
+ 1576  kubectl apply -f samples/addons/kiali.yaml
+ 1577  kubectl rollout status deployment/kiali -n istio-system
+ 1578  clear
+ 1579  cd
+ 1580  clear
+ 1581  kind create cluster --name istio-testing
+ 1582  kind get clusters
+ 1583  kubectl config get-contexts
+ 1584  kubectl config use-context kind-istio-testing
+ 1585  curl -L https://istio.io/downloadIstio | sh -
+ 1586  cd istio-1.29.1/
+ 1587  cd samples/
+ 1588  ls -lrth
+ 1589  export PATH=$PWD/bin:$PATH
+ 1590  ls -lrth
+ 1591  cd ../
+ 1592  ls -lrth
+ 1593  export PATH=$PWD/bin:$PATH
+ 1594  cd bin/
+ 1595  ls
+ 1596  cd ../
+ 1597  ls -lrth
+ 1598  export PATH=$PWD/bin:$PATH
+ 1599  clear
+ 1600  istioctl install -f samples/bookinfo/demo-profile-no-gateways.yaml -y
+ 1601  kubectl --version
+ 1602  kubectl -version
+ 1603  kubectl
+ 1604  kubectl version
+ 1605  docker pull kindest/node
+ 1606  docker images kindest/node
+ 1607  history | grep kind
+ 1608  kind delete cluster --name istio-testing
+ 1609  kind create cluster --name istio-testing --image=kindest/node:v1.30.4
+ 1610  kubectl config use-context kind-istio-testing
+ 1611  istioctl install -f samples/bookinfo/demo-profile-no-gateways.yaml -y
+ 1612  kubectl label namespace default istio-injection=enabled
+ 1613  kubectl get crd gateways.gateway.networking.k8s.io &> /dev/null || { kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.4.0" | kubectl apply -f -; }
+ 1614  kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
+ 1615  kubectl get services
+ 1616  kubectl get pods
+ 1617  kubectl exec "$(kubectl get pod -l app=ratings -o jsonpath='{.items[0].metadata.name}')" -c ratings -- curl -sS productpage:9080/productpage | grep -o "<title>.*</title>"
+ 1618  kubectl apply -f samples/bookinfo/gateway-api/bookinfo-gateway.yaml
+ 1619  kubectl annotate gateway bookinfo-gateway networking.istio.io/service-type=ClusterIP --namespace=default
+ 1620  kubectl get gateway
+ 1621  kubectl apply -f samples/addons/kiali.yaml
+ 1622  kubectl rollout status deployment/kiali -n istio-system
+ 1623  istioctl dashboard kiali
+ 1624  for i in $(seq 1 100); do curl -s -o /dev/null "http:///productpage"; done
+ 1625  clear
+ 1626  for i in $(seq 1 100); do curl -s -o /dev/null "http://localhost:8080/productpage"; done
+ 1627  kubectl port-forward svc/bookinfo-gateway-istio 8080:80
+ 1628  for i in $(seq 1 100); do curl -sSI -o /dev/null http://localhost:8080/productpage; done
+ 1629  clear
+ 1630  for i in $(seq 1 100); do curl -sSI -o /dev/null http://localhost:8080/productpage; done
+ 1631  istioctl dashboard kiali
+ 1632  cd 
+ 1633  cd istio-1.29.1/
+ 1634  cd bin/
+ 1635  istioctl dashboard kiali
+ 1636  ls -lrth
+ 1637  ./istioctl dashboard kiali
+ 1638  clear
+ 1639  ./istioctl dashboard kiali
+ 1640  ls -lrth
+ 1641  history
+ 1642  history |grep kind
+ 1643  kind get clusters
+ 1644  kubectl config use-context kind-istio-testing
+ 1645  kubectl get node
+ 1646  cd istio-1.29.1/
+ 1647  kubectl apply -f samples/addons/prometheus.yaml
+ 1648  kubectl apply -f samples/addons/kiali.yaml
+ 1649  kubectl port-forward svc/bookinfo-gateway-istio 8080:80
+ 1650  kubectl l delete -f samples/addons/prometheus.yaml
+ 1651  kubectl  delete -f samples/addons/prometheus.yaml
+ 1652  kubectl delete -f samples/addons/kiali.yaml
+ 1653  clear
+ 1654  kubectl apply -f samples/addons/kiali.yaml
+ 1655  kubectl  delete -f samples/addons/prometheus.yaml
+ 1656  kubectl  apply  -f samples/addons/prometheus.yaml
+ 1657  kubectl port-forward svc/bookinfo-gateway-istio 8080:80
+ 1658  kubectl  delete  -f samples/addons/prometheus.yaml
+ 1659  kubectl delete -f samples/addons/kiali.yaml
+ 1660  kubectl  apply  -f samples/addons/prometheus.yaml
+ 1661  kubectl apply -f samples/addons/kiali.yaml
+ 1662  kubectl port-forward svc/bookinfo-gateway-istio 8080:80
+ 1663  cd
+ 1664  ls -lrth
+ 1665  clear
+ 1666  kubectl 
+ 1667  kubectl version
+ 1668  clear
+ 1669  kubectl version
+ 1670  minikube
+ 1671  minikube version
+ 1672  clear
+ 1673  helm version
+ 1674  helm3 version
+ 1675  helm-3
+ 1676  clear
+ 1677  helm help
+ 1678  helm versuib
+ 1679  helm version
+ 1680  helm upgrade
+ 1681  kubectl get crd | grep istio
+ 1682  clear
+ 1683  sudo apt remove --purge helm
+ 1684  sudo apt autoremove
+ 1685  rm -rf ~/.config/helm ~/.cache/helm ~/.helm
+ 1686  # Install Helm via the official script (most straightforward)
+ 1687  curl -fsSL -o get-helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+ 1688  chmod 700 get-helm.sh
+ 1689  ./get-helm.sh
+ 1690  helm
+ 1691  clear
+ 1692  helm version
+ 1693  helm repo add istio https://istio-release.storage.googleapis.com/charts
+ 1694  helm repo update
+ 1695  helm repo add istio https://istio-release.storage.googleapis.com/charts
+ 1696  helm repo update
+ 1697  [200~helm repo add istio https://istio-release.storage.googleapis.com/charts
+ 1698  helm repo update
+ 1699  helm install istio-base istio/base -n istio-system --create-namespace --version 1.29
+ 1700  helm install istiod istio/istiod -n istio-system --version 1.29 --wait
+ 1701  helm install istio-ingress istio/gateway -n istio-system --version 1.29 --wait~
+ 1702  kubectl delete namespace istio-system
+ 1703  helm install istio-base istio/base -n istio-system --create-namespace --version 1.29
+ 1704  helm install istiod istio/istiod -n istio-system --version 1.29 --wait
+ 1705  helm install istio-ingress istio/gateway -n istio-system --version 1.29 --wait
+ 1706  kubectl create namespace istio-system
+ 1707  kubectl get crd | grep istio -o | xargs kubectl delete crd
+ 1708  kubectl get crd | grep istio | awk '{print $1}' | xargs kubectl delete crd
+ 1709  helm install istio-base istio/base -n istio-system --create-namespace --version 1.29
+ 1710  clear
+ 1711  helm ls -n istio-system
+ 1712  helm install istiod istio/istiod -n istio-system --wait
+ 1713  clear
+ 1714  # Download Istio release (1.29.1 in your case)
+ 1715  curl -L https://istio.io/downloadIstio | sh -
+ 1716  cd istio-1.29.1
+ 1717  export PATH=$PWD/bin:$PATH
+ 1718  # Install istio-system with default profile
+ 1719  istioctl install --set profile=default
+ 1720  clear
+ 1721  kubectl get pods -n istio-system
+ 1722  # You should see:
+ 1723  #   istiod-*
+ 1724  #   istio-ingressgateway-*
+ 1725  kubectl create ns kitchen-sre
+ 1726  kubectl label namespace kitchen-sre istio-injection=enabled
+ 1727  istioctl uninstall --purge
+ 1728  kubectl get pods -n istio-system
+ 1729  kubectl get pods 
+ 1730  kubectl get pods -A
+ 1731  kubectl get pods -n istio-system
+ 1732  kubectl describe pod istiod-cd4667d86-v7gvz -n istio-system
+ 1733  kubectl get taints
+ 1734  kubectl get node
+ 1735  cd 
+ 1736  cd ai_sre/
+ 1737  ls -lrth
+ 1738  cd traefik/
+ 1739  ls -lrth
+ 1740  bash master_launcher.sh 
+ 1741  kubectl context current-context
+ 1742  kubectl config current-context
+ 1743  # Download Istio release (1.29.1 in your case)
+ 1744  curl -L https://istio.io/downloadIstio | sh -
+ 1745  cd istio-1.29.1
+ 1746  export PATH=$PWD/bin:$PATH
+ 1747  # Install istio-system with default profile
+ 1748  istioctl install --set profile=default
+ 1749  kubectl get crd | grep istio
+ 1750  kubectl get clusterrole | grep istio
+ 1751  kubectl delete clusterrole istiod-clusterrole-istio-system
+ 1752  kubectl delete clusterrole istio-reader-clusterrole-istio-system
+ 1753  kubectl get clusterrole | grep istio
+ 1754  kubectl create namespace istio-system
+ 1755  kubectl delete clusterrole istiod-gateway-controller-istio-system
+ 1756  kubectl get clusterrole | grep istio
+ 1757  clear
+ 1758  helm repo update
+ 1759  helm install istio-base istio/base -n istio-system --version 1.29
+ 1760  helm install istiod istio/istiod -n istio-system --version 1.29 --wait
+ 1761  helm install istio-ingress istio/gateway -n istio-system --version 1.29 --wait
+ 1762  helm install istio-base istio/base   -n istio-system   --set defaultRevision=default   --create-namespace
+ 1763  helm ls -A -q | xargs -r helm uninstall -n istio-system; kubectl delete ns istio-system istio-ingress --ignore-not-found; kubectl get crd | grep istio | awk '{print $1}' | xargs -r kubectl delete crd; kubectl get validatingwebhookconfiguration,mutatingwebhookconfiguration -o name | grep istio | xargs -r kubectl delete
+ 1764  clear
+ 1765  helm install istio-base istio/base   -n istio-system   --set defaultRevision=default   --create-namespace   --version 1.29
+ 1766  helm ls -n istio-system
+ 1767  helm install istiod istio/istiod -n istio-system --wait
+ 1768  # Remove the existing ClusterRoleBinding (it’s cluster‑scoped)
+ 1769  kubectl delete clusterrolebinding istiod-clusterrole-istio-system
+ 1770  # Also clean up any leftover Istio Helm release
+ 1771  helm uninstall istiod -n istio-system || true
+ 1772  # Now re‑install
+ 1773  helm install istiod istio/istiod -n istio-system --wait
+ 1774  kubectl annotate clusterrolebinding istiod-clusterrole-istio-system   meta.helm.sh/release-name=istiod   meta.helm.sh/release-namespace=istio-system   --overwrite
+ 1775  kubectl delete clusterrolebinding istiod-gateway-controller-istio-system
+ 1776  kubectl get clusterrolebinding | grep istiod
+ 1777  helm install istiod istio/istiod -n istio-system --wait
+ 1778  helm uninstall istiod -n istio-system || true
+ 1779  kubectl delete ns istio-system || true
+ 1780  kubectl create ns istio-system
+ 1781  helm repo update
+ 1782  helm install istiod istio/istiod -n istio-system --wait
+ 1783  clear
+ 1784  # Remove the Helm binary
+ 1785  sudo rm /usr/local/bin/helm
+ 1786  # Remove Helm config and cache
+ 1787  rm -rf ~/.config/helm ~/.cache/helm ~/.helm
+ 1788  helm
+ 1789  cd ../
+ 1790  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1791  kubectl apply -f .
+ 1792  kubectl get pods -n kitchen-sre
+ 1793  kubectl apply -f .
+ 1794  kubectl get pods -n kitchen-sre
+ 1795  kubectl delete  -f .
+ 1796  kubectl apply -f .
+ 1797  kubectl get pods -n kitchen-sre
+ 1798  kubectl describe pod  flink-taskmanager-5b874c8d85-gw2rc   -n kitchen-sre
+ 1799  kubectl logs  flink-taskmanager-5b874c8d85-gw2rc   -n kitchen-sre -c istio-init
+ 1800  minikube ssh
+ 1801  sudo modprobe iptable_nat
+ 1802  sudo modprobe iptable_filter
+ 1803  sudo modprobe ip_tables
+ 1804  exit
+ 1805  cd
+ 1806  clear
+ 1807  cd ai_sre/
+ 1808  ls -lrth
+ 1809  cd traefik/
+ 1810  ls -lrth
+ 1811  vi master_launcher.sh 
+ 1812  bash master_launcher.sh 
+ 1813  kubectl get node
+ 1814  kubectl describe node gvisor-cluster
+ 1815  :q
+ 1816  vi master_launcher.sh 
+ 1817  ls
+ 1818  cat traefik.yaml 
+ 1819  clear
+ 1820  vi master_launcher.sh 
+ 1821  bash master_launcher.sh 
+ 1822  kubectl get node
+ 1823  cd ../
+ 1824  git add .; git commit -m 'added setup script'; git push 
+ 1825  cd ~-
+ 1826  ls -lrth
+ 1827  vi install_traefik_gateway_crd.sh 
+ 1828  bash install_traefik_gateway_crd.sh 
+ 1829  vi install_traefik_gateway_crd.sh 
+ 1830  history |
+ 1831  history |grep trae
+ 1832  history |grep heml
+ 1833  history |grep helm
+ 1834  vi install_traefik_gateway_crd.sh 
+ 1835  bash install_traefik_gateway_crd.sh 
+ 1836  vi master_launcher.sh 
+ 1837  clear
+ 1838  kubectl get node
+ 1839  cd ../
+ 1840  cd ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1841  ls -lrth]
+ 1842  ls -lrth
+ 1843  vi validatingAdmissionPolicy.yaml 
+ 1844  vi mutatingPolicyAddGvisor.yaml
+ 1845  vi validatingAdmissionPolicy.yaml 
+ 1846  cd ../
+ 1847  ls -lrth
+ 1848  clear
+ 1849  ls -lrth
+ 1850  cd ../../
+ 1851  ls -lrth
+ 1852  clear
+ 1853  ls -lrth
+ 1854  cd traefik/
+ 1855  ls
+ 1856  cd .//
+ 1857  cd ../
+ 1858  cd traefik/\
+ 1859  cd traefik/
+ 1860  cd istio-1.29.1/
+ 1861  kubectl create ns kitchen-sre
+ 1862  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 1863  export PATH=$PWD/bin:$PATH
+ 1864  # Install istio-system with default profile
+ 1865  istioctl install --set profile=default
+ 1866  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 1867  kubectl create ns kitchen-sre
+ 1868  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 1869  minikube ssh
+ 1870  sudo modprobe iptable_nat
+ 1871  sudo modprobe iptable_filter
+ 1872  sudo modprobe ip_tables
+ 1873  exit
+ 1874  clear
+ 1875  cd
+ 1876  clear
+ 1877  cd 
+ 1878  kubectl get pods -n kitchen-sre
+ 1879  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1880  kubectl delete -f .
+ 1881  kubectl apply -f .
+ 1882  kubectl get pods -n kitchen-sre
+ 1883  kubectl delete -f .
+ 1884  kubectl apply -f .
+ 1885  kubectl get pods -n kitchen-sre
+ 1886  kubectl delete -f .
+ 1887  cd
+ 1888  cd ai_sre/
+ 1889  git add .; git commit -m 'added setup script'; git push 
+ 1890  ls -lrth
+ 1891  cd traefik/
+ 1892  ls -lrth
+ 1893  cd istio-1.29.1/
+ 1894  ls -lrth
+ 1895  export PATH=$PWD/bin:$PATH
+ 1896  # Install istio-system with default profile
+ 1897  istioctl install --set profile=default
+ 1898  kubectl create ns kitchen-sre
+ 1899  cd ../
+ 1900  ls -lrth
+ 1901  cd ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 1902  ls -lrth
+ 1903  kubectl apply -f .
+ 1904  kubectl get pods -n kitchen-sre
+ 1905  kubectl delete -f .
+ 1906  istioctl experimental check-injec
+ 1907  istioctl experimental check-inject
+ 1908  kubectl apply  -f .
+ 1909  kubectl delete -f .
+ 1910  kubectl create ns kitchen-sre
+ 1911  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 1912  kubectl apply  -f .
+ 1913  kubectl get pods -n kitchen-sre
+ 1914  kubectl logs chroma-7455cd9587-qs9fr -n kitchen-sre -c 
+ 1915  kubectl get pod  chroma-7455cd9587-qs9fr -n kitchen-sre -o yaml
+ 1916  kubectl get pod  chroma-7455cd9587-qs9fr -n kitchen-sre -o yaml | grep container
+ 1917  kubectl get pod  chroma-7455cd9587-qs9fr -n kitchen-sre -o yaml | grep container -A2
+ 1918  kubectl get pod  chroma-7455cd9587-qs9fr -n kitchen-sre -o yaml | grep container -A2 | grep istio
+ 1919  kubectl get pod  chroma-7455cd9587-qs9fr -n kitchen-sre -o yaml
+ 1920  kubectl logs chroma-7455cd9587-qs9fr -n kitchen-sre -c istio-proxy
+ 1921  kubectl describe pod  chroma-7455cd9587-qs9fr -n kitchen-sre -c istio-init
+ 1922  kubectl describe pod  chroma-7455cd9587-qs9fr -n kitchen-sre 
+ 1923  kubectl get pods -n kitchen-sre
+ 1924  kubectl logs chroma-7455cd9587-qs9fr -n kitchen-sre -c  istio-init
+ 1925  cd
+ 1926  cd ai_sre/
+ 1927  git add .; git commit -m 'added setup script'; git push 
+ 1928  git checkout -b istio-branch
+ 1929  cd traefik/
+ 1930  ls -lrth
+ 1931  vi master_launcher.sh 
+ 1932  cd ../../
+ 1933  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/
+ 1934  ls -lrth
+ 1935  cd k8s/
+ 1936  ls -lrth
+ 1937  vi kitchen-infra.yaml 
+ 1938  vi dashboard-gateway-infra.yaml 
+ 1939  vi rag-deploy.yaml 
+ 1940  vi ollama-deploy.yaml 
+ 1941  vi app-deployments.yaml 
+ 1942  vi flink-job-infra.yaml 
+ 1943  vi redpanda-ss.yaml 
+ 1944  mv mutatingPolicyAddGvisor.yaml mutatingPolicyAddGvisor.yaml.tmp
+ 1945  mv validatingAdmissionPolicy.yaml validatingAdmissionPolicy.yaml.tmp
+ 1946  ls -lrth
+ 1947  cd ../
+ 1948  kubectl create ns kitchen-sre
+ 1949  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 1950  istioctl install --set profile=default
+ 1951  cd 
+ 1952  cd ai_sre/traefik/istio-1.29.1/
+ 1953  istioctl install --set profile=default
+ 1954  ls
+ 1955  cd bin/
+ 1956  istioctl install --set profile=default
+ 1957  cd
+ 1958  clear
+ 1959  ls -lrth
+ 1960  cd ai_sre/
+ 1961  ls -lrth
+ 1962  cd traefik/
+ 1963  ls -lrth
+ 1964  vi master_launcher.sh 
+ 1965  bash master_launcher.sh 
+ 1966  vi master_launcher.sh 
+ 1967  bash master_launcher.sh 
+ 1968  cd istio-1.29.1/
+ 1969  export PATH=$PWD/bin:$PATH
+ 1970  # Install istio-system with default profile
+ 1971  istioctl install --set profile=default
+ 1972  kubectl top nodes
+ 1973  kubectl top pods -n istio-system
+ 1974  kubectl top pods -A | sort -k3 -n | tail -10
+ 1975  kubectl get node
+ 1976  kubectl describe node istio-cluster
+ 1977  cd ../
+ 1978  cd ai_sre/
+ 1979  ls -lrth
+ 1980  cd traefik/
+ 1981  bash master_launcher.sh 
+ 1982  kubectl get node
+ 1983  vi master_launcher.sh 
+ 1984  bash master_launcher.sh 
+ 1985  cd
+ 1986  minikube delete --all --purge && sudo rm -f /usr/local/bin/minikube ~/.minikube ~/.kube/config && curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64 && minikube start --driver=docker
+ 1987  cd ai_sre/
+ 1988  vi wipe_minikube.sh
+ 1989  kubectl get node
+ 1990  kubectl get pods -A 
+ 1991  kubectl describe pod istio-ingressgateway-b7dbbb799-zntfx -n kitchen-sre 
+ 1992  kubectl describe pod istio-ingressgateway-b7dbbb799-zntfx -n istio-system
+ 1993  kubectl rollout restart deployment istiod -n istio-system
+ 1994  kubectl get pods -A 
+ 1995  kubectl delete -f istio-system istio-ingressgateway-b7dbbb799-zntfx  -n istio-system
+ 1996  kubectl delete pod istio-ingressgateway-b7dbbb799-zntfx  -n istio-system
+ 1997  kubectl get pods -A 
+ 1998  kubectl create ns kitchen-sre
+ 1999  history | grep label
+ 2000  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 2001  kubectl get pods -A 
+ 2002  kubectl get pods -n kitchen-sre
+ 2003  kubectl get pods -A 
+ 2004  kubectl describe pod istio-ingressgateway-b7dbbb799-k5cb4  -n istio-system
+ 2005  cd ../
+ 2006  cd ai_sre/ghost_kitchen_sre_k3s/ghost-kitchen-sre/k8s/
+ 2007  kubectl apply -f .
+ 2008  kubectl get pods -A 
+ 2009  kubectl delete -f .
+ 2010  kubectl create ns kitchen-sre
+ 2011  kubectl label namespace kitchen-sre  istio-injection=enabled
+ 2012  kubectl apply -f .
+ 2013  kubectl delete -f .
+ 2014  kubectl create ns kitchen-sre
+ 2015  kubectl get pods -A 
+ 2016  cd ../ 
+ 2017  cd
+ 2018  cd ai_sre/
+ 2019  ls -lrth
+ 2020  cd traefik/
+ 2021  ls -lrth
+ 2022  vi master_launcher.sh 
+ 2023  bash  master_launcher.sh 
+ 2024  kubectl get node
+ 2025  vi master_launcher.sh 
+ 2026  bash  master_launcher.sh 
+ 2027  kubectl get node
+ 2028  cd ..
+ 2029  ls -lrth
+ 2030  bash wipe_minikube.sh 
+ 2031  cp wipe_minikube.sh ~
+ 2032  cd 
+ 2033  ls -lrth
+ 2034  bash wipe_minikube.sh 
+ 2035  cd ai_sre/traefik/
+ 2036  vi master_launcher.sh 
+ 2037  bash master_launcher.sh 
+ 2038  cd istio-1.29.1/
+ 2039  export PATH=$PWD/bin:$PATH
+ 2040  history | grep istio
+ 2041  echo history > history.txt
+ 2042  cat history.txt 
+ 2043  history >  history.txt 

@@ -14,7 +14,7 @@ spec:
         app: agent
     spec:
       serviceAccountName: sre-agent-sa
-      runtimeClassName: gvisor  
+        #runtimeClassName: gvisor  
       containers:
       - name: agent
         imagePullPolicy: Always
@@ -40,7 +40,7 @@ spec:
       labels:
         app: producer
     spec:
-      runtimeClassName: gvisor
+      #runtimeClassName: gvisor
 
       containers:
       - name: producer
@@ -67,7 +67,7 @@ spec:
         app: dashboard
     spec:
       serviceAccountName: elite-dashboard-sa
-      runtimeClassName: gvisor  
+      #runtimeClassName: gvisor  
       containers:
       - name: dashboard
         image: si3mshady/aiops:dashboard-v5

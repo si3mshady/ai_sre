@@ -34,7 +34,7 @@ spec:
         app: flink
         component: jobmanager
     spec:
-      runtimeClassName: gvisor
+      #runtimeClassName: gvisor
 
       containers:
       - name: jobmanager
@@ -73,7 +73,7 @@ spec:
         app: flink
         component: taskmanager
     spec:
-      runtimeClassName: gvisor
+      #runtimeClassName: gvisor
 
       containers:
       - name: taskmanager

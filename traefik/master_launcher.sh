@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 
-PROFILE="gvisor-cluster"
+PROFILE="istio-cluster"
 minikube delete --all
-minikube start --profile="$PROFILE" --driver=docker --container-runtime=containerd --cpus=4 --memory=8192
+#minikube start --profile="$PROFILE" --driver=docker --container-runtime=containerd --cpus=3 --memory=4192
+
+minikube start --profile="$PROFILE" --driver=docker 
+
+
 minikube ssh --profile="$PROFILE" "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
 
 sleep 30
 
-minikube addons enable gvisor --profile="$PROFILE"
+#minikube addons enable gvisor --profile="$PROFILE"
 
 
 sleep 30 
@@ -23,7 +27,7 @@ helm install traefik traefik/traefik   --namespace traefik   --create-namespace 
 
 kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
 
-kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+#kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 
 helm repo add kyverno https://kyverno.github.io/kyverno/
