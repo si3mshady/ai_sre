@@ -1,0 +1,9 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: virtual-svc
+spec:
+  hosts:
+  - ghost.vision.ai
+  gateways:
+  - dashboard-cluster-gateway-controller
