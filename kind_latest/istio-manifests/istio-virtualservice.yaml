@@ -6,4 +6,9 @@ spec:
   hosts:
   - ghost.vision.ai
   gateways:
-  - dashboard-cluster-gateway-controller
+  - ai-sre-gateway-controller
+  http:
+  - route:
+    - destination:
+        host: dashboard
+        port: 8501

@@ -1,14 +1,14 @@
 apiVersion: networking.istio.io/v1
 kind: Gateway
 metadata:
-  name: dashboard-cluster-gateway-controller
+  name: ai-sre-gateway-controller
 spec:
   selector:
-    app: my-gateway-controller
+    app: dashboard
   servers:
   - port:
-      number: 80
-      name: ghost-vision
+      number: 8501
+      name: HTTP
       protocol: HTTP
     hosts:
-    - ext-host.example.com
+    - ghost.vision.ai
