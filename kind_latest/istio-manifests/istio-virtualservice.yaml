@@ -11,4 +11,5 @@ spec:
   - route:
     - destination:
         host: dashboard
-        port: 8501
+        port: 
+          number: 8501
