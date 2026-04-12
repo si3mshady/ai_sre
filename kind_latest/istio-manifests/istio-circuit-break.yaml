@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: chroma-circuit-breaker
+  namespace: kitchen-sre
+spec:
+  host: chroma # Ensure this matches your Service name exactly
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1
+      http:
+        http1MaxPendingRequests: 1
+        maxRequestsPerConnection: 1
+    outlierDetection:
+      consecutive5xxErrors: 1    # Trips on the first logic exception
+      interval: 1s               # Scans for failures every second
+      baseEjectionTime: 3m       # Ejects the "broken" pod for 3 minutes
+      maxEjectionPercent: 100    # Allows ejecting the whole service if it's dead
